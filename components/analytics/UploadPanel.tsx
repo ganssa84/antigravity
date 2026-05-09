@@ -31,9 +31,11 @@ function normalizeBrn(brn: string, year: number): string | null {
   return BRN_MERGE[brn] ?? brn;
 }
 
-// CMSD is renamed to ISD; commodity 2330 from CMSD is reassigned to EMD
+// commodity 2330 → EMD; everything else from CMSD or EMD → ISD
 function normalizeHomeTeam(home_team: string, commodity: number): string {
-  if (home_team === "CMSD") return commodity === 2330 ? "EMD" : "ISD";
+  if (home_team === "EMD" || home_team === "CMSD") {
+    return commodity === 2330 ? "EMD" : "ISD";
+  }
   return home_team;
 }
 
