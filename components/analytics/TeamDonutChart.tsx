@@ -1,16 +1,14 @@
 "use client";
 
-import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 type TeamStat = { home_team: string; amount: number; qty: number };
 
 const TEAM_COLORS: Record<string, string> = {
-  PSD: "#60a5fa",
-  EMD: "#34d399",
+  PSD: "#6366f1",
+  EMD: "#10b981",
   CMSD: "#a78bfa",
-  IATD: "#fbbf24",
+  IATD: "#f59e0b",
   ASD: "#f87171",
   AAD: "#fb923c",
 };
@@ -25,8 +23,8 @@ export default function TeamDonutChart({ data }: { data: TeamStat[] }) {
   const total = data.reduce((s, r) => s + r.amount, 0);
 
   return (
-    <div className="rounded-2xl bg-white/3 border border-white/8 p-6">
-      <h3 className="text-sm font-medium text-gray-300 mb-4">Home Team별 매출 비중</h3>
+    <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">Home Team별 매출 비중</h3>
       <ResponsiveContainer width="100%" height={260}>
         <PieChart>
           <Pie
@@ -44,15 +42,13 @@ export default function TeamDonutChart({ data }: { data: TeamStat[] }) {
             ))}
           </Pie>
           <Tooltip
-            contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: 8 }}
+            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
             formatter={(v) => {
               const n = typeof v === "number" ? v : 0;
               return [`${formatAmount(n)} (${((n / total) * 100).toFixed(1)}%)`, "매출"];
             }}
           />
-          <Legend
-            formatter={(value) => <span style={{ color: "#9ca3af", fontSize: 12 }}>{value}</span>}
-          />
+          <Legend formatter={(value) => <span style={{ color: "#6b7280", fontSize: 12 }}>{value}</span>} />
         </PieChart>
       </ResponsiveContainer>
     </div>

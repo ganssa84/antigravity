@@ -8,10 +8,10 @@ type MonthlyPoint = { month: number; amount: number; qty: number };
 type ByYear = Record<number, MonthlyPoint[]>;
 
 const YEAR_COLORS: Record<number, string> = {
-  2023: "#60a5fa",
-  2024: "#34d399",
-  2025: "#a78bfa",
-  2026: "#fbbf24",
+  2023: "#6366f1",
+  2024: "#0ea5e9",
+  2025: "#10b981",
+  2026: "#f59e0b",
 };
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -24,11 +24,8 @@ function formatAmount(v: number) {
 }
 
 export default function MonthlySalesChart({ byYear }: { byYear: ByYear }) {
-  const years = Object.keys(byYear)
-    .map(Number)
-    .sort((a, b) => a - b);
+  const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
 
-  // Build unified month-indexed data
   const chartData = MONTH_LABELS.map((label, idx) => {
     const month = idx + 1;
     const row: Record<string, number | string> = { month: label };
@@ -40,19 +37,19 @@ export default function MonthlySalesChart({ byYear }: { byYear: ByYear }) {
   });
 
   return (
-    <div className="rounded-2xl bg-white/3 border border-white/8 p-6">
-      <h3 className="text-sm font-medium text-gray-300 mb-4">월별 매출 추이 (연도별)</h3>
+    <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">월별 매출 추이</h3>
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
-          <XAxis dataKey="month" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
-          <YAxis tickFormatter={formatAmount} tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} width={56} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="month" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tickFormatter={formatAmount} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} width={56} />
           <Tooltip
-            contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: 8 }}
-            labelStyle={{ color: "#9ca3af" }}
+            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+            labelStyle={{ color: "#374151", fontWeight: 600 }}
             formatter={(v) => [`${(v as number).toLocaleString()} 원`, ""]}
           />
-          <Legend wrapperStyle={{ fontSize: 12, color: "#9ca3af" }} />
+          <Legend wrapperStyle={{ fontSize: 12, color: "#6b7280" }} />
           {years.map((yr) => (
             <Line
               key={yr}

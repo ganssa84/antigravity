@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 type Product = { material: string; material_id: string; amount: number; qty: number };
 
@@ -25,16 +23,16 @@ export default function TopProductsChart({ data }: { data: Product[] }) {
   }));
 
   return (
-    <div className="rounded-2xl bg-white/3 border border-white/8 p-6">
+    <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-300">Top 15 제품</h3>
-        <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
+        <h3 className="text-sm font-semibold text-gray-700">Top 15 제품</h3>
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
           {(["amount", "qty"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                mode === m ? "bg-white/15 text-white" : "text-gray-500 hover:text-gray-300"
+                mode === m ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
             >
               {m === "amount" ? "매출" : "수량"}
@@ -43,15 +41,11 @@ export default function TopProductsChart({ data }: { data: Product[] }) {
         </div>
       </div>
       <ResponsiveContainer width="100%" height={420}>
-        <BarChart
-          layout="vertical"
-          data={chartData}
-          margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" horizontal={false} />
+        <BarChart layout="vertical" data={chartData} margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
           <XAxis
             type="number"
-            tick={{ fill: "#6b7280", fontSize: 10 }}
+            tick={{ fill: "#9ca3af", fontSize: 10 }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) =>
@@ -64,12 +58,12 @@ export default function TopProductsChart({ data }: { data: Product[] }) {
             type="category"
             dataKey="name"
             width={160}
-            tick={{ fill: "#9ca3af", fontSize: 11 }}
+            tick={{ fill: "#6b7280", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
           />
           <Tooltip
-            contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: 8 }}
+            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
             formatter={(v) => {
               const n = (v as number).toLocaleString();
               return mode === "amount" ? [`${n} 원`, "매출"] : [`${n} EA`, "수량"];
@@ -78,10 +72,7 @@ export default function TopProductsChart({ data }: { data: Product[] }) {
           />
           <Bar dataKey="value" radius={[0, 4, 4, 0]}>
             {chartData.map((_, i) => (
-              <Cell
-                key={i}
-                fill={`hsl(${210 + i * 12}, 70%, ${55 - i * 2}%)`}
-              />
+              <Cell key={i} fill={`hsl(${230 + i * 8}, 65%, ${55 - i * 1.5}%)`} />
             ))}
           </Bar>
         </BarChart>

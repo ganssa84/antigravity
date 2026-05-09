@@ -9,30 +9,25 @@ import TopProductsChart from "./TopProductsChart";
 import TeamDonutChart from "./TeamDonutChart";
 import PartnerBarChart from "./PartnerBarChart";
 import BRNPieChart from "./BRNPieChart";
-import FilterBar from "./FilterBar";
 import UploadPanel, { type ProcessedData } from "./UploadPanel";
 
-const TEAM_LABELS: Record<string, string> = {
-  ALL: "전체", AAD: "AAD", ASD: "ASD", CMSD: "CMSD", EMD: "EMD", PSD: "PSD", IATD: "IATD",
+const TEAMS = ["AAD", "ASD", "CMSD", "EMD", "PSD", "IATD"] as const;
+
+const TEAM_COLORS: Record<string, string> = {
+  AAD: "#fb923c", ASD: "#f87171", CMSD: "#a78bfa",
+  EMD: "#10b981", PSD: "#6366f1", IATD: "#f59e0b",
 };
 
-export default function DashboardClient({
-  initialTeam = "ALL",
-  initialYear = "ALL",
-}: {
-  initialTeam?: string;
-  initialYear?: string;
-}) {
+export default function DashboardClient({ initialTab = "overview" }: { initialTab?: string }) {
   const router = useRouter();
   const [rawData, setRawData] = useState<ProcessedData | null>(null);
-  const [selectedTeam, setSelectedTeam] = useState(initialTeam);
-  const [selectedYear, setSelectedYear] = useState(initialYear);
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  const [selectedYear, setSelectedYear] = useState("ALL");
   const [showUpload, setShowUpload] = useState(false);
 
-  const allTeams = rawData?.summary.teams ?? [];
   const allYears = rawData?.summary.years ?? [];
+  const selectedTeam = activeTab === "overview" ? "ALL" : activeTab;
 
-  // All filtering & aggregation happens in the browser — no API calls
   const chartData = useMemo(() => {
     if (!rawData) return null;
 
@@ -43,7 +38,6 @@ export default function DashboardClient({
     const filter = <T extends { home_team: string; year: number }>(d: T[]) =>
       byYear(byTeam(d));
 
-    // Monthly by-year map for line chart
     const monthlyFiltered = filter(rawData.monthly);
     const monthlyByYear: Record<number, { month: number; amount: number; qty: number }[]> = {};
     for (const r of monthlyFiltered) {
@@ -53,14 +47,12 @@ export default function DashboardClient({
       else monthlyByYear[r.year].push({ month: r.month, amount: r.amount, qty: r.qty });
     }
 
-    // Yearly totals for bar chart
     const yearlyMap = new Map<number, number>();
     for (const r of monthlyFiltered) yearlyMap.set(r.year, (yearlyMap.get(r.year) ?? 0) + r.amount);
     const yearly = Array.from(yearlyMap.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([year, amount]) => ({ year, amount, qty: 0 }));
 
-    // Top products
     const productMap = new Map<string, { material: string; material_id: string; amount: number; qty: number }>();
     for (const r of filter(rawData.products)) {
       const ex = productMap.get(r.material_id);
@@ -69,7 +61,6 @@ export default function DashboardClient({
     }
     const products = Array.from(productMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 15);
 
-    // Top partners
     const partnerMap = new Map<string, { partner_name: string; amount: number; qty: number; num_products: number }>();
     for (const r of filter(rawData.partners)) {
       const ex = partnerMap.get(r.partner_name);
@@ -78,7 +69,6 @@ export default function DashboardClient({
     }
     const partners = Array.from(partnerMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 15);
 
-    // Teams (filter by year only, not team — for donut chart)
     const teamMap = new Map<string, { home_team: string; amount: number; qty: number }>();
     for (const r of byYear(rawData.monthly)) {
       const ex = teamMap.get(r.home_team);
@@ -87,7 +77,6 @@ export default function DashboardClient({
     }
     const teams = Array.from(teamMap.values()).sort((a, b) => b.amount - a.amount);
 
-    // BRN totals
     const brnMap = new Map<string, { brn: string; amount: number; qty: number }>();
     for (const r of filter(rawData.brn)) {
       const ex = brnMap.get(r.brn);
@@ -96,7 +85,6 @@ export default function DashboardClient({
     }
     const brnTotals = Array.from(brnMap.values()).sort((a, b) => b.amount - a.amount);
 
-    // KPI
     const totalAmount = monthlyFiltered.reduce((s, r) => s + r.amount, 0);
     const totalQty = monthlyFiltered.reduce((s, r) => s + r.qty, 0);
     const kpi = {
@@ -115,99 +103,180 @@ export default function DashboardClient({
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      {/* Header */}
-      <header className="border-b border-white/8 px-6 py-4">
-        <div className="max-w-screen-xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
-              <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    <div className="flex min-h-screen bg-[#f8fafc]">
+      {/* Sidebar */}
+      <aside className="w-56 bg-white border-r border-gray-100 flex flex-col sticky top-0 h-screen shrink-0 z-10">
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-base font-semibold">eCommerce Analytics</h1>
-              <p className="text-xs text-gray-500">
-                {TEAM_LABELS[selectedTeam] || selectedTeam} · {selectedYear === "ALL" ? "전체 기간" : `${selectedYear}년`}
-              </p>
+              <p className="text-sm font-semibold text-gray-900 leading-tight">eCommerce</p>
+              <p className="text-xs text-gray-400">Analytics</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {rawData && (
-              <button
-                onClick={() => setShowUpload((v) => !v)}
-                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                  showUpload
-                    ? "bg-emerald-600/20 border-emerald-500/30 text-emerald-400"
-                    : "border-white/10 text-gray-500 hover:text-gray-300 hover:bg-white/5"
-                }`}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                파일 교체
-              </button>
-            )}
-            <button
-              onClick={handleLogout}
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
-            >
-              로그아웃
-            </button>
-          </div>
         </div>
-      </header>
 
-      <main className="max-w-screen-xl mx-auto px-6 py-6 space-y-6">
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          <button
+            onClick={() => setActiveTab("overview")}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+              activeTab === "overview"
+                ? "bg-indigo-50 text-indigo-700 font-medium"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+            Overview
+          </button>
 
-        {/* No data state — show upload panel front and center */}
-        {!rawData && (
-          <div className="flex flex-col items-center justify-center py-12">
-            <p className="text-gray-500 text-sm mb-6">Excel 파일을 올리면 대시보드가 바로 표시됩니다.</p>
+          <div className="pt-4 pb-1.5 px-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Home Teams</p>
+          </div>
+
+          {TEAMS.map((team) => (
+            <button
+              key={team}
+              onClick={() => setActiveTab(team)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                activeTab === team
+                  ? "bg-indigo-50 text-indigo-700 font-medium"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: TEAM_COLORS[team] }}
+              />
+              {team}
+            </button>
+          ))}
+        </nav>
+
+        {/* Bottom actions */}
+        <div className="px-3 py-3 border-t border-gray-100 space-y-0.5">
+          {rawData && (
+            <button
+              onClick={() => setShowUpload((v) => !v)}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                showUpload ? "bg-emerald-50 text-emerald-700" : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              파일 교체
+            </button>
+          )}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            로그아웃
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="flex-1 overflow-auto">
+        {!rawData ? (
+          <div className="flex flex-col items-center justify-center min-h-screen px-8">
+            <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center mb-4">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            </div>
+            <p className="text-gray-500 text-sm mb-6">Excel 파일을 올리면 대시보드가 표시됩니다.</p>
             <div className="w-full max-w-lg">
               <UploadPanel onData={(data) => { setRawData(data); setShowUpload(false); }} />
             </div>
           </div>
-        )}
-
-        {/* Upload panel (file replace) */}
-        {rawData && showUpload && (
-          <UploadPanel onData={(data) => { setRawData(data); setShowUpload(false); }} />
-        )}
-
-        {/* Dashboard */}
-        {rawData && chartData && (
+        ) : (
           <>
-            <FilterBar
-              teams={allTeams}
-              years={allYears}
-              selectedTeam={selectedTeam}
-              selectedYear={selectedYear}
-              onTeamChange={setSelectedTeam}
-              onYearChange={setSelectedYear}
-            />
-
-            <KPICards kpi={chartData.kpi} />
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-              <div className="xl:col-span-2">
-                <MonthlySalesChart byYear={chartData.monthlyByYear} />
+            {showUpload && (
+              <div className="px-8 pt-6">
+                <UploadPanel onData={(data) => { setRawData(data); setShowUpload(false); }} />
               </div>
+            )}
+
+            {/* Page header */}
+            <div className="px-8 pt-6 pb-2 flex items-start justify-between">
               <div>
-                {chartData.yearly.length > 0 && <YearlyBarChart data={chartData.yearly} />}
+                <h1 className="text-xl font-semibold text-gray-900">
+                  {activeTab === "overview" ? "Overview" : activeTab}
+                </h1>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {activeTab === "overview" ? "전체 현황" : `${activeTab} Home Team`}
+                  {selectedYear !== "ALL" && ` · ${selectedYear}년`}
+                </p>
+              </div>
+
+              {/* Year filter */}
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1 shrink-0">
+                <button
+                  onClick={() => setSelectedYear("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    selectedYear === "ALL" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  전체
+                </button>
+                {allYears.map((y) => (
+                  <button
+                    key={y}
+                    onClick={() => setSelectedYear(String(y))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      selectedYear === String(y) ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {y}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TeamDonutChart data={chartData.teams} />
-              <BRNPieChart data={chartData.brnTotals} />
-            </div>
+            {chartData && (
+              <div className="px-8 pb-10 pt-4 space-y-5">
+                <KPICards kpi={chartData.kpi} />
 
-            <TopProductsChart data={chartData.products} />
-            <PartnerBarChart data={chartData.partners} />
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+                  <div className="xl:col-span-2">
+                    <MonthlySalesChart byYear={chartData.monthlyByYear} />
+                  </div>
+                  <YearlyBarChart data={chartData.yearly} />
+                </div>
+
+                {activeTab === "overview" ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <TeamDonutChart data={chartData.teams} />
+                      <BRNPieChart data={chartData.brnTotals} />
+                    </div>
+                    <TopProductsChart data={chartData.products} />
+                    <PartnerBarChart data={chartData.partners} />
+                  </>
+                ) : (
+                  <>
+                    <TopProductsChart data={chartData.products} />
+                    <PartnerBarChart data={chartData.partners} />
+                    <BRNPieChart data={chartData.brnTotals} />
+                  </>
+                )}
+              </div>
+            )}
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 }

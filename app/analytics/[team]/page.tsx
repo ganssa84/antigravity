@@ -6,22 +6,19 @@ const VALID_TEAMS = ["AAD", "ASD", "CMSD", "EMD", "PSD", "IATD"];
 
 type Props = {
   params: Promise<{ team: string }>;
-  searchParams: Promise<{ year?: string }>;
 };
 
-export default async function TeamDashboardPage({ params, searchParams }: Props) {
+export default async function TeamDashboardPage({ params }: Props) {
   const { team } = await params;
-  const sp = await searchParams;
+  const teamUpper = team.toUpperCase();
 
-  if (!VALID_TEAMS.includes(team.toUpperCase())) {
+  if (!VALID_TEAMS.includes(teamUpper)) {
     notFound();
   }
 
-  const year = sp.year || "ALL";
-
   return (
     <Suspense>
-      <DashboardClient initialTeam={team.toUpperCase()} initialYear={year} />
+      <DashboardClient initialTab={teamUpper} />
     </Suspense>
   );
 }
