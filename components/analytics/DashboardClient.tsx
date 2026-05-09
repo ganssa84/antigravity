@@ -9,6 +9,7 @@ import TopProductsChart from "./TopProductsChart";
 import TeamDonutChart from "./TeamDonutChart";
 import PartnerBarChart from "./PartnerBarChart";
 import BRNPieChart from "./BRNPieChart";
+import CommodityCompareChart from "./CommodityCompareChart";
 import UploadPanel, { type ProcessedData } from "./UploadPanel";
 
 const TEAMS = ["AAD", "ASD", "ISD", "EMD", "PSD", "IATD"] as const;
@@ -94,7 +95,30 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       num_products: productMap.size || rawData.summary.overall.num_products,
     };
 
-    return { monthlyByYear, yearly, products, partners, teams, brnTotals, kpi };
+    // Commodity YoY comparison
+    const currentYr = selectedYear === "ALL"
+      ? Math.max(...rawData.summary.years)
+      : parseInt(selectedYear);
+    const prevYr = currentYr - 1;
+
+    const cMap = new Map<number, { current: number; prev: number }>();
+    for (const r of byTeam(rawData.commodity)) {
+      if (r.year !== currentYr && r.year !== prevYr) continue;
+      if (!cMap.has(r.commodity)) cMap.set(r.commodity, { current: 0, prev: 0 });
+      const entry = cMap.get(r.commodity)!;
+      if (r.year === currentYr) entry.current += r.amount;
+      else entry.prev += r.amount;
+    }
+    const commodityCompare = Array.from(cMap.entries())
+      .map(([commodity, d]) => ({
+        commodity,
+        currentAmount: Math.round(d.current),
+        prevAmount: Math.round(d.prev),
+        change: d.prev > 0 ? ((d.current - d.prev) / d.prev) * 100 : null,
+      }))
+      .sort((a, b) => b.currentAmount - a.currentAmount);
+
+    return { monthlyByYear, yearly, products, partners, teams, brnTotals, kpi, commodityCompare, currentYr, prevYr };
   }, [rawData, selectedTeam, selectedYear]);
 
   async function handleLogout() {
@@ -262,11 +286,21 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                       <TeamDonutChart data={chartData.teams} />
                       <BRNPieChart data={chartData.brnTotals} />
                     </div>
+                    <CommodityCompareChart
+                      data={chartData.commodityCompare}
+                      currentYear={chartData.currentYr}
+                      prevYear={chartData.prevYr}
+                    />
                     <TopProductsChart data={chartData.products} />
                     <PartnerBarChart data={chartData.partners} />
                   </>
                 ) : (
                   <>
+                    <CommodityCompareChart
+                      data={chartData.commodityCompare}
+                      currentYear={chartData.currentYr}
+                      prevYear={chartData.prevYr}
+                    />
                     <TopProductsChart data={chartData.products} />
                     <PartnerBarChart data={chartData.partners} />
                     <BRNPieChart data={chartData.brnTotals} />
