@@ -161,12 +161,14 @@ const STATUS_LABELS: Record<ProcessStatus, string> = {
   idle: "",
   reading: "파일 읽는 중...",
   processing: "데이터 집계 중...",
-  uploading: "서버에 저장 중...",
-  done: "업데이트 완료!",
+  uploading: "처리 중...",
+  done: "완료!",
   error: "",
 };
 
-export default function UploadPanel({ onDone }: { onDone: () => void }) {
+export type ProcessedData = ReturnType<typeof buildPayload>;
+
+export default function UploadPanel({ onData }: { onData: (data: ProcessedData) => void }) {
   const [status, setStatus] = useState<ProcessStatus>("idle");
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
@@ -209,33 +211,15 @@ export default function UploadPanel({ onDone }: { onDone: () => void }) {
       const payload = processRows(dataRows as unknown[][]);
       setProgress(`집계 완료. 서버에 저장 중...`);
 
-      setStatus("uploading");
-      const res = await fetch("/api/analytics/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        let errMsg = `서버 오류 (${res.status})`;
-        try {
-          const d = await res.json();
-          errMsg = d.error || errMsg;
-        } catch {}
-        throw new Error(errMsg);
-      }
-
       setStatus("done");
       setProgress("");
-      setTimeout(() => {
-        onDone();
-        setStatus("idle");
-      }, 1500);
+      onData(payload);
+      setTimeout(() => setStatus("idle"), 1500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "알 수 없는 오류");
       setStatus("error");
     }
-  }, [onDone]);
+  }, [onData]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

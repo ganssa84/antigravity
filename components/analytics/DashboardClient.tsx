@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import KPICards from "./KPICards";
 import MonthlySalesChart from "./MonthlySalesChart";
@@ -10,21 +10,7 @@ import TeamDonutChart from "./TeamDonutChart";
 import PartnerBarChart from "./PartnerBarChart";
 import BRNPieChart from "./BRNPieChart";
 import FilterBar from "./FilterBar";
-import UploadPanel from "./UploadPanel";
-
-type KPI = { total_amount: number; total_qty: number; num_partners: number; num_products: number };
-type Summary = {
-  overall: KPI & { num_customers: number };
-  by_team: Record<string, KPI & { num_customers: number }>;
-  by_year: Record<string, KPI & { num_customers: number }>;
-  teams: string[];
-  years: number[];
-  brns: string[];
-};
-type MonthlyData = {
-  monthly: { year: number; month: number; amount: number; qty: number }[];
-  byYear: Record<number, { month: number; amount: number; qty: number }[]>;
-};
+import UploadPanel, { type ProcessedData } from "./UploadPanel";
 
 const TEAM_LABELS: Record<string, string> = {
   ALL: "전체", AAD: "AAD", ASD: "ASD", CMSD: "CMSD", EMD: "EMD", PSD: "PSD", IATD: "IATD",
@@ -38,81 +24,95 @@ export default function DashboardClient({
   initialYear?: string;
 }) {
   const router = useRouter();
+  const [rawData, setRawData] = useState<ProcessedData | null>(null);
   const [selectedTeam, setSelectedTeam] = useState(initialTeam);
   const [selectedYear, setSelectedYear] = useState(initialYear);
   const [showUpload, setShowUpload] = useState(false);
 
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [monthly, setMonthly] = useState<MonthlyData | null>(null);
-  const [products, setProducts] = useState<{ material: string; material_id: string; amount: number; qty: number }[]>([]);
-  const [partners, setPartners] = useState<{ partner_name: string; amount: number; qty: number; num_products: number }[]>([]);
-  const [teamStats, setTeamStats] = useState<{ home_team: string; amount: number; qty: number }[]>([]);
-  const [brnTotals, setBrnTotals] = useState<{ brn: string; amount: number; qty: number }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const allTeams = rawData?.summary.teams ?? [];
+  const allYears = rawData?.summary.years ?? [];
 
-  const buildQuery = (team: string, year: string) => {
-    const p = new URLSearchParams();
-    if (team !== "ALL") p.set("team", team);
-    if (year !== "ALL") p.set("year", year);
-    return p.toString() ? `?${p}` : "";
-  };
+  // All filtering & aggregation happens in the browser — no API calls
+  const chartData = useMemo(() => {
+    if (!rawData) return null;
 
-  const fetchAll = useCallback(async (team: string, year: string) => {
-    setLoading(true);
-    const q = buildQuery(team, year);
-    const yq = year !== "ALL" ? `?year=${year}` : "";
-    try {
-      const [sRes, mRes, pRes, ptRes, tRes, bRes] = await Promise.all([
-        fetch(`/api/analytics/summary${q}`),
-        fetch(`/api/analytics/monthly${q}`),
-        fetch(`/api/analytics/products${q}&limit=15`),
-        fetch(`/api/analytics/partners${q}`),
-        fetch(`/api/analytics/teams${yq}`),
-        fetch(`/api/analytics/brn${q}`),
-      ]);
-      const [sData, mData, pData, ptData, tData, bData] = await Promise.all([
-        sRes.json(), mRes.json(), pRes.json(), ptRes.json(), tRes.json(), bRes.json(),
-      ]);
-      setSummary(sData.teams ? sData : null);
-      setMonthly(mData);
-      setProducts(pData);
-      setPartners(ptData);
-      setTeamStats(tData);
-      setBrnTotals(bData.totals ?? []);
-    } finally {
-      setLoading(false);
+    const byTeam = <T extends { home_team: string }>(d: T[]) =>
+      selectedTeam === "ALL" ? d : d.filter((r) => r.home_team === selectedTeam);
+    const byYear = <T extends { year: number }>(d: T[]) =>
+      selectedYear === "ALL" ? d : d.filter((r) => r.year === parseInt(selectedYear));
+    const filter = <T extends { home_team: string; year: number }>(d: T[]) =>
+      byYear(byTeam(d));
+
+    // Monthly by-year map for line chart
+    const monthlyFiltered = filter(rawData.monthly);
+    const monthlyByYear: Record<number, { month: number; amount: number; qty: number }[]> = {};
+    for (const r of monthlyFiltered) {
+      if (!monthlyByYear[r.year]) monthlyByYear[r.year] = [];
+      const ex = monthlyByYear[r.year].find((d) => d.month === r.month);
+      if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+      else monthlyByYear[r.year].push({ month: r.month, amount: r.amount, qty: r.qty });
     }
-  }, []);
 
-  useEffect(() => {
-    fetchAll(selectedTeam, selectedYear);
-  }, [fetchAll, selectedTeam, selectedYear]);
+    // Yearly totals for bar chart
+    const yearlyMap = new Map<number, number>();
+    for (const r of monthlyFiltered) yearlyMap.set(r.year, (yearlyMap.get(r.year) ?? 0) + r.amount);
+    const yearly = Array.from(yearlyMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([year, amount]) => ({ year, amount, qty: 0 }));
 
-  const kpi: KPI | null = summary
-    ? selectedTeam === "ALL"
-      ? { total_amount: summary.overall.total_amount, total_qty: summary.overall.total_qty, num_partners: summary.overall.num_partners, num_products: summary.overall.num_products }
-      : { total_amount: summary.by_team[selectedTeam]?.total_amount ?? 0, total_qty: summary.by_team[selectedTeam]?.total_qty ?? 0, num_partners: summary.by_team[selectedTeam]?.num_partners ?? 0, num_products: summary.by_team[selectedTeam]?.num_products ?? 0 }
-    : null;
+    // Top products
+    const productMap = new Map<string, { material: string; material_id: string; amount: number; qty: number }>();
+    for (const r of filter(rawData.products)) {
+      const ex = productMap.get(r.material_id);
+      if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+      else productMap.set(r.material_id, { material: r.material, material_id: r.material_id, amount: r.amount, qty: r.qty });
+    }
+    const products = Array.from(productMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 15);
 
-  // Build yearly summary from monthly data
-  const yearlySummary = monthly
-    ? Object.entries(
-        monthly.monthly.reduce<Record<number, number>>((acc, r) => {
-          acc[r.year] = (acc[r.year] ?? 0) + r.amount;
-          return acc;
-        }, {})
-      )
-        .map(([year, amount]) => ({ year: parseInt(year), amount, qty: 0 }))
-        .sort((a, b) => a.year - b.year)
-    : [];
+    // Top partners
+    const partnerMap = new Map<string, { partner_name: string; amount: number; qty: number; num_products: number }>();
+    for (const r of filter(rawData.partners)) {
+      const ex = partnerMap.get(r.partner_name);
+      if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+      else partnerMap.set(r.partner_name, { partner_name: r.partner_name, amount: r.amount, qty: r.qty, num_products: r.num_products });
+    }
+    const partners = Array.from(partnerMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 15);
+
+    // Teams (filter by year only, not team — for donut chart)
+    const teamMap = new Map<string, { home_team: string; amount: number; qty: number }>();
+    for (const r of byYear(rawData.monthly)) {
+      const ex = teamMap.get(r.home_team);
+      if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+      else teamMap.set(r.home_team, { home_team: r.home_team, amount: r.amount, qty: r.qty });
+    }
+    const teams = Array.from(teamMap.values()).sort((a, b) => b.amount - a.amount);
+
+    // BRN totals
+    const brnMap = new Map<string, { brn: string; amount: number; qty: number }>();
+    for (const r of filter(rawData.brn)) {
+      const ex = brnMap.get(r.brn);
+      if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+      else brnMap.set(r.brn, { brn: r.brn, amount: r.amount, qty: r.qty });
+    }
+    const brnTotals = Array.from(brnMap.values()).sort((a, b) => b.amount - a.amount);
+
+    // KPI
+    const totalAmount = monthlyFiltered.reduce((s, r) => s + r.amount, 0);
+    const totalQty = monthlyFiltered.reduce((s, r) => s + r.qty, 0);
+    const kpi = {
+      total_amount: Math.round(totalAmount),
+      total_qty: Math.round(totalQty * 100) / 100,
+      num_partners: partnerMap.size || rawData.summary.overall.num_partners,
+      num_products: productMap.size || rawData.summary.overall.num_products,
+    };
+
+    return { monthlyByYear, yearly, products, partners, teams, brnTotals, kpi };
+  }, [rawData, selectedTeam, selectedYear]);
 
   async function handleLogout() {
     await fetch("/api/analytics/auth", { method: "DELETE" });
     router.push("/analytics/login");
   }
-
-  const allTeams = summary?.teams ?? [];
-  const allYears = summary?.years ?? [];
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
@@ -133,19 +133,21 @@ export default function DashboardClient({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowUpload((v) => !v)}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                showUpload
-                  ? "bg-emerald-600/20 border-emerald-500/30 text-emerald-400"
-                  : "border-white/10 text-gray-500 hover:text-gray-300 hover:bg-white/5"
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              데이터 업데이트
-            </button>
+            {rawData && (
+              <button
+                onClick={() => setShowUpload((v) => !v)}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                  showUpload
+                    ? "bg-emerald-600/20 border-emerald-500/30 text-emerald-400"
+                    : "border-white/10 text-gray-500 hover:text-gray-300 hover:bg-white/5"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                파일 교체
+              </button>
+            )}
             <button
               onClick={handleLogout}
               className="text-xs text-gray-500 hover:text-gray-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
@@ -157,59 +159,52 @@ export default function DashboardClient({
       </header>
 
       <main className="max-w-screen-xl mx-auto px-6 py-6 space-y-6">
-        {/* Upload panel */}
-        {showUpload && (
-          <UploadPanel
-            onDone={() => {
-              setShowUpload(false);
-              fetchAll(selectedTeam, selectedYear);
-            }}
-          />
-        )}
 
-        {/* Filter bar */}
-        <FilterBar
-          teams={allTeams}
-          years={allYears}
-          selectedTeam={selectedTeam}
-          selectedYear={selectedYear}
-          onTeamChange={setSelectedTeam}
-          onYearChange={setSelectedYear}
-        />
-
-        {loading && (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex items-center gap-2 text-gray-600 text-sm">
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              데이터 불러오는 중...
+        {/* No data state — show upload panel front and center */}
+        {!rawData && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <p className="text-gray-500 text-sm mb-6">Excel 파일을 올리면 대시보드가 바로 표시됩니다.</p>
+            <div className="w-full max-w-lg">
+              <UploadPanel onData={(data) => { setRawData(data); setShowUpload(false); }} />
             </div>
           </div>
         )}
 
-        {!loading && (
+        {/* Upload panel (file replace) */}
+        {rawData && showUpload && (
+          <UploadPanel onData={(data) => { setRawData(data); setShowUpload(false); }} />
+        )}
+
+        {/* Dashboard */}
+        {rawData && chartData && (
           <>
-            <KPICards kpi={kpi} />
+            <FilterBar
+              teams={allTeams}
+              years={allYears}
+              selectedTeam={selectedTeam}
+              selectedYear={selectedYear}
+              onTeamChange={setSelectedTeam}
+              onYearChange={setSelectedYear}
+            />
+
+            <KPICards kpi={chartData.kpi} />
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               <div className="xl:col-span-2">
-                {monthly?.byYear && <MonthlySalesChart byYear={monthly.byYear} />}
+                <MonthlySalesChart byYear={chartData.monthlyByYear} />
               </div>
               <div>
-                {yearlySummary.length > 0 && <YearlyBarChart data={yearlySummary} />}
+                {chartData.yearly.length > 0 && <YearlyBarChart data={chartData.yearly} />}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TeamDonutChart data={teamStats} />
-              <BRNPieChart data={brnTotals} />
+              <TeamDonutChart data={chartData.teams} />
+              <BRNPieChart data={chartData.brnTotals} />
             </div>
 
-            <TopProductsChart data={products} />
-
-            <PartnerBarChart data={partners} />
+            <TopProductsChart data={chartData.products} />
+            <PartnerBarChart data={chartData.partners} />
           </>
         )}
       </main>
