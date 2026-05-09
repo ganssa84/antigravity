@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# analytics data (generated from Excel, not for version control)
+/data/analytics/
+/Analysis/
