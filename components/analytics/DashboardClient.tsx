@@ -11,10 +11,10 @@ import PartnerBarChart from "./PartnerBarChart";
 import BRNPieChart from "./BRNPieChart";
 import UploadPanel, { type ProcessedData } from "./UploadPanel";
 
-const TEAMS = ["AAD", "ASD", "CMSD", "EMD", "PSD", "IATD"] as const;
+const TEAMS = ["AAD", "ASD", "ISD", "EMD", "PSD", "IATD"] as const;
 
 const TEAM_COLORS: Record<string, string> = {
-  AAD: "#fb923c", ASD: "#f87171", CMSD: "#a78bfa",
+  AAD: "#fb923c", ASD: "#f87171", ISD: "#a78bfa",
   EMD: "#10b981", PSD: "#6366f1", IATD: "#f59e0b",
 };
 

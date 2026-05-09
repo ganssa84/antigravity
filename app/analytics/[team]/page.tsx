@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import DashboardClient from "@/components/analytics/DashboardClient";
 
-const VALID_TEAMS = ["AAD", "ASD", "CMSD", "EMD", "PSD", "IATD"];
+const VALID_TEAMS = ["AAD", "ASD", "ISD", "EMD", "PSD", "IATD"];
 
 type Props = {
   params: Promise<{ team: string }>;

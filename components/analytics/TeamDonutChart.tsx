@@ -7,7 +7,7 @@ type TeamStat = { home_team: string; amount: number; qty: number };
 const TEAM_COLORS: Record<string, string> = {
   PSD: "#6366f1",
   EMD: "#10b981",
-  CMSD: "#a78bfa",
+  ISD: "#a78bfa",
   IATD: "#f59e0b",
   ASD: "#f87171",
   AAD: "#fb923c",

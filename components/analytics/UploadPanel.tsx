@@ -31,6 +31,12 @@ function normalizeBrn(brn: string, year: number): string | null {
   return BRN_MERGE[brn] ?? brn;
 }
 
+// CMSD is renamed to ISD; commodity 2330 from CMSD is reassigned to EMD
+function normalizeHomeTeam(home_team: string, commodity: number): string {
+  if (home_team === "CMSD") return commodity === 2330 ? "EMD" : "ISD";
+  return home_team;
+}
+
 function processRows(rows: unknown[][]): ReturnType<typeof buildPayload> {
   const data: Row[] = [];
   for (const raw of rows) {
@@ -43,13 +49,16 @@ function processRows(rows: unknown[][]): ReturnType<typeof buildPayload> {
     const resolvedBrn = normalizeBrn(rawBrn, year);
     if (resolvedBrn === null) continue;
 
+    const commodity = Number(raw[COL.commodity] ?? 0);
+    const rawTeam = String(raw[COL.home_team] ?? "");
+
     data.push({
       brn: resolvedBrn,
       customer_name: String(raw[COL.customer_name] ?? ""),
       partner_id: Number(raw[COL.partner_id]),
       partner_name: String(raw[COL.partner_name] ?? ""),
-      home_team: String(raw[COL.home_team] ?? ""),
-      commodity: Number(raw[COL.commodity] ?? 0),
+      home_team: normalizeHomeTeam(rawTeam, commodity),
+      commodity,
       material_id: String(raw[COL.material_id] ?? ""),
       material: String(raw[COL.material] ?? ""),
       unit_cost: Number(raw[COL.unit_cost] ?? 0),
