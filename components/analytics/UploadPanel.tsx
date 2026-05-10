@@ -156,7 +156,34 @@ function buildPayload(data: Row[]) {
     ...r, amount: Math.round(r.amount), num_products: products.size,
   }));
 
-  return { summary, monthly, products, partners, brn, commodity };
+  const partnerBrnMap: Record<string, { partner_name: string; brn: string; home_team: string; year: number; amount: number; qty: number }> = {};
+  for (const r of data) {
+    const k = `${r.partner_name}|${r.brn}|${r.home_team}|${r.year}`;
+    if (!partnerBrnMap[k]) partnerBrnMap[k] = { partner_name: r.partner_name, brn: r.brn, home_team: r.home_team, year: r.year, amount: 0, qty: 0 };
+    partnerBrnMap[k].amount += r.amount;
+    partnerBrnMap[k].qty += r.qty;
+  }
+  const partnerBrn = Object.values(partnerBrnMap).map(r => ({ ...r, amount: Math.round(r.amount), qty: Math.round(r.qty * 100) / 100 }));
+
+  const partnerProdMap: Record<string, { partner_name: string; material: string; material_id: string; brn: string; home_team: string; year: number; amount: number; qty: number }> = {};
+  for (const r of data) {
+    const k = `${r.partner_name}|${r.material_id}|${r.brn}|${r.home_team}|${r.year}`;
+    if (!partnerProdMap[k]) partnerProdMap[k] = { partner_name: r.partner_name, material: r.material, material_id: r.material_id, brn: r.brn, home_team: r.home_team, year: r.year, amount: 0, qty: 0 };
+    partnerProdMap[k].amount += r.amount;
+    partnerProdMap[k].qty += r.qty;
+  }
+  const partnerProducts = Object.values(partnerProdMap).map(r => ({ ...r, amount: Math.round(r.amount), qty: Math.round(r.qty * 100) / 100 }));
+
+  const commodityMonthlyMap: Record<string, { commodity: number; home_team: string; year: number; month: number; amount: number; qty: number }> = {};
+  for (const r of data) {
+    const k = `${r.commodity}|${r.home_team}|${r.year}|${r.month}`;
+    if (!commodityMonthlyMap[k]) commodityMonthlyMap[k] = { commodity: r.commodity, home_team: r.home_team, year: r.year, month: r.month, amount: 0, qty: 0 };
+    commodityMonthlyMap[k].amount += r.amount;
+    commodityMonthlyMap[k].qty += r.qty;
+  }
+  const commodityMonthly = Object.values(commodityMonthlyMap).map(r => ({ ...r, amount: Math.round(r.amount), qty: Math.round(r.qty * 100) / 100 }));
+
+  return { summary, monthly, products, partners, brn, commodity, partnerBrn, partnerProducts, commodityMonthly };
 }
 
 const STATUS_LABELS: Record<ProcessStatus, string> = {

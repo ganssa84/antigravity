@@ -19,21 +19,35 @@ const RADIAN = Math.PI / 180;
 
 const renderLabel = (props: Record<string, unknown>) => {
   const { cx, cy, midAngle, outerRadius, name, percent } = props;
-  if ((percent as number) < 0.04) return null;
-  const r = (outerRadius as number) + 22;
-  const x = (cx as number) + r * Math.cos(-(midAngle as number) * RADIAN);
-  const y = (cy as number) + r * Math.sin(-(midAngle as number) * RADIAN);
+  if ((percent as number) < 0.02) return null;
+  const angle = -(midAngle as number) * RADIAN;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const or = outerRadius as number;
+  const cxN = cx as number;
+  const cyN = cy as number;
+  const sx = cxN + (or + 3) * cos;
+  const sy = cyN + (or + 3) * sin;
+  const mx = cxN + (or + 18) * cos;
+  const my = cyN + (or + 18) * sin;
+  const ex = mx + (cos >= 0 ? 16 : -16);
+  const ey = my;
+  const textAnchor = cos >= 0 ? "start" : "end";
   return (
-    <text
-      x={x} y={y}
-      fill="#374151"
-      textAnchor={x > (cx as number) ? "start" : "end"}
-      dominantBaseline="central"
-      fontSize={11}
-      fontWeight={500}
-    >
-      {name as string}
-    </text>
+    <g>
+      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke="#94a3b8" strokeWidth={1} fill="none" />
+      <text
+        x={ex + (cos >= 0 ? 4 : -4)}
+        y={ey}
+        fill="#374151"
+        textAnchor={textAnchor}
+        dominantBaseline="central"
+        fontSize={11}
+        fontWeight={500}
+      >
+        {name as string}
+      </text>
+    </g>
   );
 };
 
@@ -51,8 +65,8 @@ export default function TeamDonutChart({ data }: { data: TeamStat[] }) {
             nameKey="home_team"
             cx="50%"
             cy="50%"
-            innerRadius={62}
-            outerRadius={95}
+            innerRadius={55}
+            outerRadius={82}
             paddingAngle={2}
             label={renderLabel as never}
             labelLine={false}

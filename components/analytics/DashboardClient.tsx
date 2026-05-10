@@ -99,31 +99,18 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       num_products: productMap.size || rawData.summary.overall.num_products,
     };
 
-    // Commodity YoY comparison
-    const currentYr = selectedYear === "ALL"
-      ? Math.max(...rawData.summary.years)
-      : parseInt(selectedYear);
-    const prevYr = currentYr - 1;
+    const partnerBrn = filter(rawData.partnerBrn);
+    const partnerProducts = filter(rawData.partnerProducts);
 
-    const cMap = new Map<number, { current: number; prev: number }>();
-    for (const r of byTeam(rawData.commodity)) {
-      if (r.year !== currentYr && r.year !== prevYr) continue;
-      if (!cMap.has(r.commodity)) cMap.set(r.commodity, { current: 0, prev: 0 });
-      const entry = cMap.get(r.commodity)!;
-      if (r.year === currentYr) entry.current += r.amount;
-      else entry.prev += r.amount;
-    }
-    const commodityCompare = Array.from(cMap.entries())
-      .map(([commodity, d]) => ({
-        commodity,
-        currentAmount: Math.round(d.current),
-        prevAmount: Math.round(d.prev),
-        change: d.prev > 0 ? ((d.current - d.prev) / d.prev) * 100 : null,
-      }))
-      .sort((a, b) => b.currentAmount - a.currentAmount);
-
-    return { monthlyByYear, yearly, products, partners, teams, brnTotals, kpi, commodityCompare, currentYr, prevYr };
+    return { monthlyByYear, yearly, products, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts };
   }, [rawData, selectedTeam, selectedYear]);
+
+  const commodityMonthlyByTeam = useMemo(() => {
+    if (!rawData) return [];
+    return selectedTeam === "ALL"
+      ? rawData.commodityMonthly
+      : rawData.commodityMonthly.filter(r => r.home_team === selectedTeam);
+  }, [rawData, selectedTeam]);
 
   async function handleLogout() {
     await fetch("/api/analytics/auth", { method: "DELETE" });
@@ -320,17 +307,16 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                       <BRNPieChart data={chartData.brnTotals} />
                     </div>
                     <TopProductsChart data={chartData.products} />
-                    <PartnerBarChart data={chartData.partners} />
+                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                   </>
                 ) : (
                   <>
                     <CommodityCompareChart
-                      data={chartData.commodityCompare}
-                      currentYear={chartData.currentYr}
-                      prevYear={chartData.prevYr}
+                      data={commodityMonthlyByTeam}
+                      allYears={rawData.summary.years}
                     />
                     <TopProductsChart data={chartData.products} />
-                    <PartnerBarChart data={chartData.partners} />
+                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                     <BRNPieChart data={chartData.brnTotals} />
                   </>
                 )}
