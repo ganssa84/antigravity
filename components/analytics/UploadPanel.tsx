@@ -32,19 +32,22 @@ function normalizeBrn(brn: string, year: number): string | null {
 }
 
 // Known data entry errors: amount is inflated by a fixed factor.
-// Year-agnostic key: `${partner_name}|${material}` — applied to all years.
-// Year-specific key: `${partner_name}|${material}|${year}` — takes priority.
-const AMOUNT_CORRECTIONS: Record<string, number> = {
-  "한신그레이스(한국3M)|533 NBR Foam Palm Navy L": 100,
-  "한신그레이스(한국3M)|1100R DISPENSER REFILL EARPLUG, 200": 100,
-  "한신그레이스(한국3M)|533 NBR Foam Palm Navy M|2023": 50,
-};
+// Uses partial matching (includes) to handle fullwidth parentheses and minor whitespace variants in Excel.
+type CorrectionRule = { partnerContains: string; materialContains: string; divisor: number; year?: number };
+const CORRECTION_RULES: CorrectionRule[] = [
+  { partnerContains: "한신그레이스", materialContains: "533 NBR Foam Palm Navy L", divisor: 100 },
+  { partnerContains: "한신그레이스", materialContains: "1100R DISPENSER REFILL EARPLUG", divisor: 100 },
+  { partnerContains: "한신그레이스", materialContains: "533 NBR Foam Palm Navy M", divisor: 50, year: 2023 },
+];
 
 function correctAmount(partner_name: string, material: string, year: number, amount: number): number {
-  const divisor =
-    AMOUNT_CORRECTIONS[`${partner_name}|${material}|${year}`] ??
-    AMOUNT_CORRECTIONS[`${partner_name}|${material}`];
-  return divisor ? amount / divisor : amount;
+  const rule = CORRECTION_RULES.find(
+    (r) =>
+      partner_name.includes(r.partnerContains) &&
+      material.includes(r.materialContains) &&
+      (r.year === undefined || r.year === year)
+  );
+  return rule ? amount / rule.divisor : amount;
 }
 
 // commodity 2330 → EMD; everything else from CMSD or EMD → ISD
