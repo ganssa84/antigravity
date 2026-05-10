@@ -143,9 +143,9 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
   const pageSubtitle = isOverview ? "전체 현황" : isProducts ? "제품 현황 및 트렌드" : `${activeTab} Home Team`;
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc]">
+    <div className="flex h-screen overflow-hidden bg-[#f8fafc]">
       {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-100 flex flex-col sticky top-0 h-screen shrink-0 z-10">
+      <aside className="w-56 bg-white border-r border-gray-100 flex flex-col h-full shrink-0 z-10">
         {/* Logo */}
         <div className="px-5 py-5 border-b border-gray-100">
           <div className="flex items-center gap-2.5">
@@ -234,10 +234,10 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="flex-1 overflow-auto">
+      {/* Main — true scroll container so sticky top-0 on header works */}
+      <div className="flex-1 overflow-y-auto">
         {!rawData ? (
-          <div className="flex flex-col items-center justify-center min-h-screen px-8">
+          <div className="flex flex-col items-center justify-center min-h-full py-16 px-8">
             <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center mb-4">
               <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
