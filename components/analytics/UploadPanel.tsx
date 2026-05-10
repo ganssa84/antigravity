@@ -32,14 +32,18 @@ function normalizeBrn(brn: string, year: number): string | null {
 }
 
 // Known data entry errors: amount is inflated by a fixed factor.
-// Key: `${partner_name}|${material}|${year}`, value: divisor to correct the amount.
+// Year-agnostic key: `${partner_name}|${material}` — applied to all years.
+// Year-specific key: `${partner_name}|${material}|${year}` — takes priority.
 const AMOUNT_CORRECTIONS: Record<string, number> = {
-  "한신그레이스(한국3M)|533 NBR Foam Palm Navy L|2023": 50,
+  "한신그레이스(한국3M)|533 NBR Foam Palm Navy L": 100,
+  "한신그레이스(한국3M)|1100R DISPENSER REFILL EARPLUG, 200": 100,
   "한신그레이스(한국3M)|533 NBR Foam Palm Navy M|2023": 50,
 };
 
 function correctAmount(partner_name: string, material: string, year: number, amount: number): number {
-  const divisor = AMOUNT_CORRECTIONS[`${partner_name}|${material}|${year}`];
+  const divisor =
+    AMOUNT_CORRECTIONS[`${partner_name}|${material}|${year}`] ??
+    AMOUNT_CORRECTIONS[`${partner_name}|${material}`];
   return divisor ? amount / divisor : amount;
 }
 

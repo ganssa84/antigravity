@@ -16,25 +16,31 @@ const MP_COLORS: Record<string, string> = {
 
 type TrendRow = Record<string, number | string>;
 
-const StackLabel = (props: Record<string, unknown>) => {
+const makeStackLabel = (color: string) => (props: Record<string, unknown>) => {
   const x = props.x as number;
   const y = props.y as number;
   const width = props.width as number;
   const height = props.height as number;
   const value = props.value as number;
-  if (value < 5 || height < 16) return null;
+  if (!value || value < 0.5) return null;
+
+  if (value >= 10 && height >= 16) {
+    return (
+      <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="central" fill="white" fontSize={10} fontWeight={700}>
+        {value.toFixed(0)}%
+      </text>
+    );
+  }
+
+  const cx = x + width;
+  const cy = y + Math.max(height / 2, 0);
   return (
-    <text
-      x={x + width / 2}
-      y={y + height / 2}
-      textAnchor="middle"
-      dominantBaseline="central"
-      fill="white"
-      fontSize={10}
-      fontWeight={700}
-    >
-      {value.toFixed(0)}%
-    </text>
+    <g>
+      <line x1={cx} y1={cy} x2={cx + 14} y2={cy} stroke={color} strokeWidth={1.2} />
+      <text x={cx + 17} y={cy} textAnchor="start" dominantBaseline="central" fill={color} fontSize={9} fontWeight={700}>
+        {value.toFixed(0)}%
+      </text>
+    </g>
   );
 };
 
@@ -46,7 +52,7 @@ export default function MarketplaceTrendChart({ data }: { data: TrendRow[] }) {
       <h3 className="text-sm font-semibold text-gray-700 mb-1">마켓플레이스 연도별 점유율 추이</h3>
       <p className="text-xs text-gray-400 mb-4">연도별 각 마켓플레이스의 매출 비중 (%)</p>
       <ResponsiveContainer width="100%" height={260}>
-        <BarChart data={data} margin={{ top: 4, right: 12, left: 0, bottom: 0 }} barCategoryGap="30%">
+        <BarChart data={data} margin={{ top: 4, right: 52, left: 0, bottom: 0 }} barCategoryGap="30%">
           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
           <XAxis dataKey="year" tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
           <YAxis
@@ -71,7 +77,7 @@ export default function MarketplaceTrendChart({ data }: { data: TrendRow[] }) {
             >
               <LabelList
                 dataKey={MARKETPLACE_NAMES[brn] || brn}
-                content={StackLabel as never}
+                content={makeStackLabel(MP_COLORS[brn]) as never}
               />
             </Bar>
           ))}
