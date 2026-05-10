@@ -130,11 +130,31 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       }
       const teams = Array.from(teamMap.values()).sort((a, b) => b.amount - a.amount);
 
+      const brnLatest = yearly.at(-1);
+      const brnPrev = yearly.at(-2);
+      let brnPrevAmount: number | undefined;
+      let brnYoyRate: number | undefined;
+      if (brnLatest && brnPrev && selectedYear === "ALL") {
+        brnPrevAmount = brnLatest.compareAmount ?? brnPrev.amount;
+        brnYoyRate = brnPrevAmount > 0 ? (brnLatest.amount - brnPrevAmount) / brnPrevAmount * 100 : undefined;
+      }
+      const brnCompletedYears = yearly.filter(y => !y.compareLabel);
+      let brnCagr: number | undefined;
+      if (brnCompletedYears.length >= 2) {
+        const first = brnCompletedYears[0].amount;
+        const last = brnCompletedYears.at(-1)!.amount;
+        const n = brnCompletedYears.length - 1;
+        if (first > 0) brnCagr = (Math.pow(last / first, 1 / n) - 1) * 100;
+      }
+
       const kpi = {
         total_amount: Math.round(brnFilt.reduce((s, r) => s + r.amount, 0)),
         total_qty: Math.round(brnFilt.reduce((s, r) => s + r.qty, 0) * 100) / 100,
         num_partners: new Set(pbFilt.map(r => r.partner_name)).size,
         num_products: new Set(ppFilt.map(r => r.material_id)).size,
+        prev_amount: brnPrevAmount,
+        yoy_rate: brnYoyRate,
+        cagr: brnCagr,
       };
 
       let growthRate: number | null = null;
@@ -273,11 +293,32 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
 
     const totalAmount = monthlyFiltered.reduce((s, r) => s + r.amount, 0);
     const totalQty = monthlyFiltered.reduce((s, r) => s + r.qty, 0);
+
+    const latestEntry = yearly.at(-1);
+    const prevEntry = yearly.at(-2);
+    let prevAmount: number | undefined;
+    let yoyRate: number | undefined;
+    if (latestEntry && prevEntry && selectedYear === "ALL") {
+      prevAmount = latestEntry.compareAmount ?? prevEntry.amount;
+      yoyRate = prevAmount > 0 ? (latestEntry.amount - prevAmount) / prevAmount * 100 : undefined;
+    }
+    const completedYears = yearly.filter(y => !y.compareLabel);
+    let cagrVal: number | undefined;
+    if (completedYears.length >= 2) {
+      const first = completedYears[0].amount;
+      const last = completedYears.at(-1)!.amount;
+      const n = completedYears.length - 1;
+      if (first > 0) cagrVal = (Math.pow(last / first, 1 / n) - 1) * 100;
+    }
+
     const kpi = {
       total_amount: Math.round(totalAmount),
       total_qty: Math.round(totalQty * 100) / 100,
       num_partners: partnerMap.size || rawData.summary.overall.num_partners,
       num_products: productMap.size || rawData.summary.overall.num_products,
+      prev_amount: prevAmount,
+      yoy_rate: yoyRate,
+      cagr: cagrVal,
     };
 
     const partnerBrn = filter(rawData.partnerBrn);
@@ -515,8 +556,10 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
               <div className="px-8 pb-10 pt-4 space-y-5">
                 <KPICards
                   kpi={chartData.kpi}
-                  visibleKeys={isOverview ? ["total_amount"] : ["total_amount", "total_qty", "num_partners", "num_products"]}
-                  growthRate={chartData.growthRate}
+                  visibleKeys={isOverview
+                    ? ["total_amount", "prev_amount", "yoy_rate", "cagr"]
+                    : ["total_amount", "total_qty", "num_partners", "num_products"]}
+                  growthRate={isOverview ? null : chartData.growthRate}
                 />
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">

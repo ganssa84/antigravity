@@ -31,6 +31,18 @@ function normalizeBrn(brn: string, year: number): string | null {
   return BRN_MERGE[brn] ?? brn;
 }
 
+// Known data entry errors: amount is inflated by a fixed factor.
+// Key: `${partner_name}|${material}|${year}`, value: divisor to correct the amount.
+const AMOUNT_CORRECTIONS: Record<string, number> = {
+  "한신그레이스(한국3M)|533 NBR Foam Palm Navy L|2023": 50,
+  "한신그레이스(한국3M)|533 NBR Foam Palm Navy M|2023": 50,
+};
+
+function correctAmount(partner_name: string, material: string, year: number, amount: number): number {
+  const divisor = AMOUNT_CORRECTIONS[`${partner_name}|${material}|${year}`];
+  return divisor ? amount / divisor : amount;
+}
+
 // commodity 2330 → EMD; everything else from CMSD or EMD → ISD
 function normalizeHomeTeam(home_team: string, commodity: number): string {
   if (home_team === "EMD" || home_team === "CMSD") {
@@ -53,21 +65,24 @@ function processRows(rows: unknown[][]): ReturnType<typeof buildPayload> {
 
     const commodity = Number(raw[COL.commodity] ?? 0);
     const rawTeam = String(raw[COL.home_team] ?? "");
+    const partnerName = String(raw[COL.partner_name] ?? "");
+    const material = String(raw[COL.material] ?? "");
+    const correctedAmount = isNaN(amount) ? 0 : correctAmount(partnerName, material, year, amount);
 
     data.push({
       brn: resolvedBrn,
       customer_name: String(raw[COL.customer_name] ?? ""),
       partner_id: Number(raw[COL.partner_id]),
-      partner_name: String(raw[COL.partner_name] ?? ""),
+      partner_name: partnerName,
       home_team: normalizeHomeTeam(rawTeam, commodity),
       commodity,
       material_id: String(raw[COL.material_id] ?? ""),
-      material: String(raw[COL.material] ?? ""),
+      material,
       unit_cost: Number(raw[COL.unit_cost] ?? 0),
       year,
       month,
       qty: Number(raw[COL.qty] ?? 0),
-      amount: isNaN(amount) ? 0 : amount,
+      amount: correctedAmount,
     });
   }
   return buildPayload(data);
