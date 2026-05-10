@@ -40,15 +40,17 @@ export default function CommodityCompareChart({
   const maxYear = allYears[allYears.length - 1] ?? new Date().getFullYear();
   const [viewYear, setViewYear] = useState<number>(maxYear);
 
-  const { chartData, topCommodities } = useMemo(() => {
+  const { chartData, topCommodities, yearlyTotals } = useMemo(() => {
     if (mode === "yearly") {
       // Aggregate by commodity × year, find top 10
       const totals = new Map<number, number>();
       const byKey = new Map<string, number>();
+      const yearTotals = new Map<number, number>();
       for (const r of data) {
         totals.set(r.commodity, (totals.get(r.commodity) ?? 0) + r.amount);
         const k = `${r.commodity}|${r.year}`;
         byKey.set(k, (byKey.get(k) ?? 0) + r.amount);
+        yearTotals.set(r.year, (yearTotals.get(r.year) ?? 0) + r.amount);
       }
       const top = Array.from(totals.entries())
         .sort((a, b) => b[1] - a[1])
@@ -62,11 +64,19 @@ export default function CommodityCompareChart({
         }
         return row;
       });
-      return { chartData: rows, topCommodities: top };
+
+      const yearlyTotals = allYears.map((y, i) => {
+        const amt = yearTotals.get(y) ?? 0;
+        const prevAmt = i > 0 ? (yearTotals.get(allYears[i - 1]) ?? 0) : 0;
+        const yoy = i === 0 || prevAmt === 0 ? null : ((amt - prevAmt) / prevAmt) * 100;
+        return { year: y, amount: amt, yoy };
+      });
+      return { chartData: rows, topCommodities: top, yearlyTotals };
     }
 
     // monthly / quarterly: filter by viewYear, top 8 commodities
     const filtered = data.filter(r => r.year === viewYear);
+    const yearlyTotals: { year: number; amount: number; yoy: number | null }[] = [];
     const totals = new Map<number, number>();
     for (const r of filtered) totals.set(r.commodity, (totals.get(r.commodity) ?? 0) + r.amount);
     const top = Array.from(totals.entries())
@@ -84,7 +94,7 @@ export default function CommodityCompareChart({
         }
         return row;
       });
-      return { chartData: rows, topCommodities: top };
+      return { chartData: rows, topCommodities: top, yearlyTotals };
     }
 
     // quarterly
@@ -96,7 +106,7 @@ export default function CommodityCompareChart({
       }
       return row;
     });
-    return { chartData: rows, topCommodities: top };
+    return { chartData: rows, topCommodities: top, yearlyTotals };
   }, [data, allYears, mode, viewYear]);
 
   if (data.length === 0) return null;
@@ -139,11 +149,27 @@ export default function CommodityCompareChart({
         </div>
       )}
 
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-gray-400 mb-3">
         {mode === "yearly"
           ? `${allYears[0] ?? ""}년 ~ ${allYears[allYears.length - 1] ?? ""}년 · Top 10 Commodity`
           : `${viewYear}년 · Top 8 Commodity`}
       </p>
+
+      {mode === "yearly" && yearlyTotals.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {yearlyTotals.map((yt) => (
+            <span key={yt.year} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium bg-gray-50 border-gray-200 text-gray-700">
+              <span className="text-gray-400">{yt.year}</span>
+              <span className="font-semibold">{formatAmount(yt.amount)}원</span>
+              {yt.yoy !== null && (
+                <span className={yt.yoy >= 0 ? "text-emerald-600" : "text-red-500"}>
+                  {yt.yoy >= 0 ? "▲" : "▼"}{Math.abs(yt.yoy).toFixed(1)}%
+                </span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
 
       {mode === "yearly" ? (
         <ResponsiveContainer width="100%" height={yearlyChartHeight}>

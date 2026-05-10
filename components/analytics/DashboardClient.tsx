@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import KPICards from "./KPICards";
 import MonthlySalesChart from "./MonthlySalesChart";
-import YearlyBarChart from "./YearlyBarChart";
+import YearlyBarChart, { type YearlyStat } from "./YearlyBarChart";
 import YTDChart from "./YTDChart";
 import TopProductsChart from "./TopProductsChart";
 import TeamDonutChart from "./TeamDonutChart";
@@ -15,6 +15,7 @@ import UploadPanel, { type ProcessedData } from "./UploadPanel";
 import MarketplaceTrendChart from "./MarketplaceTrendChart";
 import ProductGrowthChart, { type GrowthItem } from "./ProductGrowthChart";
 import PartnerParetoChart from "./PartnerParetoChart";
+import InsightPanel, { type InsightInputs } from "./InsightPanel";
 
 const TEAMS = ["AAD", "ASD", "ISD", "EMD", "PSD", "IATD"] as const;
 const MARKETPLACE_BRNS = ["2208162517", "1208800767", "1198666372", "2208183676", "8158101244"] as const;
@@ -83,7 +84,29 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
 
       const yearlyMap = new Map<number, number>();
       for (const r of brnFilt) yearlyMap.set(r.year, (yearlyMap.get(r.year) ?? 0) + r.amount);
-      const yearly = Array.from(yearlyMap.entries()).sort((a, b) => a[0] - b[0]).map(([year, amount]) => ({ year, amount, qty: 0 }));
+      const yearlyRawMP: YearlyStat[] = Array.from(yearlyMap.entries()).sort((a, b) => a[0] - b[0]).map(([year, amount]) => ({ year, amount, qty: 0 }));
+      const yearly = (() => {
+        if (yearlyRawMP.length < 2 || selectedYear !== "ALL") return yearlyRawMP;
+        const latestYr = yearlyRawMP.at(-1)!.year;
+        const prevYr = yearlyRawMP.at(-2)!.year;
+        const brnMon = brnAllData.map(r => ({ year: r.year, month: r.month, amount: r.amount }));
+        const latestMons = [...new Set(brnMon.filter(r => r.year === latestYr).map(r => r.month))].sort((a, b) => a - b);
+        if (latestMons.length >= 12) return yearlyRawMP;
+        let valid = latestMons;
+        for (let d = 0; d < latestMons.length; d++) {
+          const mons = latestMons.slice(0, latestMons.length - d);
+          const ms = new Set(mons);
+          const cur = brnMon.filter(r => r.year === latestYr && ms.has(r.month)).reduce((s, r) => s + r.amount, 0);
+          const prev = brnMon.filter(r => r.year === prevYr && ms.has(r.month)).reduce((s, r) => s + r.amount, 0);
+          if (prev === 0 || (cur - prev) / prev >= -0.8) { valid = mons; break; }
+          if (d === latestMons.length - 1) valid = mons;
+        }
+        const ms = new Set(valid);
+        const adjAmt = brnMon.filter(r => r.year === latestYr && ms.has(r.month)).reduce((s, r) => s + r.amount, 0);
+        const cmpAmt = brnMon.filter(r => r.year === prevYr && ms.has(r.month)).reduce((s, r) => s + r.amount, 0);
+        const maxMon = Math.max(...valid);
+        return yearlyRawMP.map(y => y.year === latestYr ? { ...y, amount: adjAmt, compareAmount: cmpAmt, compareLabel: `vs ${prevYr} 1-${maxMon}월` } : y);
+      })();
 
       const yearlyAllMap = new Map<number, number>();
       for (const r of brnAllData) yearlyAllMap.set(r.year, (yearlyAllMap.get(r.year) ?? 0) + r.amount);
@@ -173,9 +196,31 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
 
     const yearlyMap = new Map<number, number>();
     for (const r of monthlyFiltered) yearlyMap.set(r.year, (yearlyMap.get(r.year) ?? 0) + r.amount);
-    const yearly = Array.from(yearlyMap.entries())
+    const yearlyRaw: YearlyStat[] = Array.from(yearlyMap.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([year, amount]) => ({ year, amount, qty: 0 }));
+    const yearly = (() => {
+      if (yearlyRaw.length < 2 || selectedYear !== "ALL") return yearlyRaw;
+      const latestYr = yearlyRaw.at(-1)!.year;
+      const prevYr = yearlyRaw.at(-2)!.year;
+      const allMon = byTeam(rawData.monthly).map(r => ({ year: r.year, month: r.month, amount: r.amount }));
+      const latestMons = [...new Set(allMon.filter(r => r.year === latestYr).map(r => r.month))].sort((a, b) => a - b);
+      if (latestMons.length >= 12) return yearlyRaw;
+      let valid = latestMons;
+      for (let d = 0; d < latestMons.length; d++) {
+        const mons = latestMons.slice(0, latestMons.length - d);
+        const ms = new Set(mons);
+        const cur = allMon.filter(r => r.year === latestYr && ms.has(r.month)).reduce((s, r) => s + r.amount, 0);
+        const prev = allMon.filter(r => r.year === prevYr && ms.has(r.month)).reduce((s, r) => s + r.amount, 0);
+        if (prev === 0 || (cur - prev) / prev >= -0.8) { valid = mons; break; }
+        if (d === latestMons.length - 1) valid = mons;
+      }
+      const ms = new Set(valid);
+      const adjAmt = allMon.filter(r => r.year === latestYr && ms.has(r.month)).reduce((s, r) => s + r.amount, 0);
+      const cmpAmt = allMon.filter(r => r.year === prevYr && ms.has(r.month)).reduce((s, r) => s + r.amount, 0);
+      const maxMon = Math.max(...valid);
+      return yearlyRaw.map(y => y.year === latestYr ? { ...y, amount: adjAmt, compareAmount: cmpAmt, compareLabel: `vs ${prevYr} 1-${maxMon}월` } : y);
+    })();
 
     const monthlyByYearAll: Record<number, { month: number; amount: number; qty: number }[]> = {};
     for (const r of byTeam(rawData.monthly)) {
@@ -494,6 +539,16 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                     <ProductGrowthChart topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining} currentYear={chartData.growthTargetYear} prevYear={chartData.growthPrevYear} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                     <PartnerParetoChart data={chartData.partnersAll} />
+                    <InsightPanel
+                      tabType="overview" tabName="Overview"
+                      kpi={chartData.kpi} yearly={chartData.yearly}
+                      topProducts={chartData.products.slice(0, 10)}
+                      partnersAll={chartData.partnersAll}
+                      growthRate={chartData.growthRate}
+                      topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining}
+                      brnTotals={chartData.brnTotals} teams={chartData.teams}
+                      growthTargetYear={chartData.growthTargetYear} growthPrevYear={chartData.growthPrevYear}
+                    />
                   </>
                 )}
 
@@ -504,6 +559,15 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                     <ProductGrowthChart topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining} currentYear={chartData.growthTargetYear} prevYear={chartData.growthPrevYear} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                     <PartnerParetoChart data={chartData.partnersAll} />
+                    <InsightPanel
+                      tabType="marketplace" tabName={mpName}
+                      kpi={chartData.kpi} yearly={chartData.yearly}
+                      topProducts={chartData.products.slice(0, 10)}
+                      partnersAll={chartData.partnersAll}
+                      growthRate={chartData.growthRate}
+                      topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining}
+                      growthTargetYear={chartData.growthTargetYear} growthPrevYear={chartData.growthPrevYear}
+                    />
                   </>
                 )}
 
@@ -518,6 +582,16 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <BRNPieChart data={chartData.brnTotals} />
+                    <InsightPanel
+                      tabType="team" tabName={activeTab}
+                      kpi={chartData.kpi} yearly={chartData.yearly}
+                      topProducts={chartData.products.slice(0, 10)}
+                      partnersAll={chartData.partnersAll}
+                      growthRate={chartData.growthRate}
+                      topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining}
+                      brnTotals={chartData.brnTotals}
+                      growthTargetYear={chartData.growthTargetYear} growthPrevYear={chartData.growthPrevYear}
+                    />
                   </>
                 )}
               </div>

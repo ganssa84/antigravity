@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList,
 } from "recharts";
 import { MARKETPLACE_NAMES } from "./BRNPieChart";
 
@@ -15,6 +15,28 @@ const MP_COLORS: Record<string, string> = {
 };
 
 type TrendRow = Record<string, number | string>;
+
+const StackLabel = (props: Record<string, unknown>) => {
+  const x = props.x as number;
+  const y = props.y as number;
+  const width = props.width as number;
+  const height = props.height as number;
+  const value = props.value as number;
+  if (value < 5 || height < 16) return null;
+  return (
+    <text
+      x={x + width / 2}
+      y={y + height / 2}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fill="white"
+      fontSize={10}
+      fontWeight={700}
+    >
+      {value.toFixed(0)}%
+    </text>
+  );
+};
 
 export default function MarketplaceTrendChart({ data }: { data: TrendRow[] }) {
   if (data.length < 2) return null;
@@ -40,13 +62,18 @@ export default function MarketplaceTrendChart({ data }: { data: TrendRow[] }) {
             formatter={(v, name) => [`${v}%`, name]}
           />
           <Legend wrapperStyle={{ fontSize: 12, color: "#6b7280" }} />
-          {MARKETPLACE_BRNS.map(brn => (
+          {MARKETPLACE_BRNS.map((brn) => (
             <Bar
               key={brn}
               dataKey={MARKETPLACE_NAMES[brn] || brn}
               stackId="a"
               fill={MP_COLORS[brn]}
-            />
+            >
+              <LabelList
+                dataKey={MARKETPLACE_NAMES[brn] || brn}
+                content={StackLabel as never}
+              />
+            </Bar>
           ))}
         </BarChart>
       </ResponsiveContainer>

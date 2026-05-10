@@ -57,8 +57,8 @@ export default function TeamDonutChart({ data }: { data: TeamStat[] }) {
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
       <h3 className="text-sm font-semibold text-gray-700 mb-4">Home Team별 매출 비중</h3>
-      <ResponsiveContainer width="100%" height={380}>
-        <PieChart>
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart margin={{ top: -24, bottom: -24 }}>
           <Pie
             data={data}
             dataKey="amount"
