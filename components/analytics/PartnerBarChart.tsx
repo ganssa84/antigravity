@@ -126,7 +126,10 @@ export default function PartnerBarChart({
         </div>
       </div>
 
-      <p className="text-xs text-gray-400 mb-3">업체명 또는 바 클릭 시 제품 상세 보기</p>
+      <p className="inline-flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full mb-3 font-medium">
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" /></svg>
+        업체명 또는 바 클릭 시 제품 상세 보기
+      </p>
 
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart layout="vertical" data={chartData} margin={{ top: 0, right: 80, left: 0, bottom: 0 }}>
