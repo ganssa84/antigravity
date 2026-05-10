@@ -10,7 +10,7 @@ type KPI = {
 function formatKRW(value: number) {
   if (Math.abs(value) >= 1_000_000_000_000) return `${(value / 1_000_000_000_000).toFixed(1)}조`;
   if (Math.abs(value) >= 100_000_000) return `${(value / 100_000_000).toFixed(1)}억`;
-  if (Math.abs(value) >= 10_000) return `${(value / 10_000).toFixed(0)}만`;
+  if (Math.abs(value) >= 10_000) return `${Math.round(value / 10_000).toLocaleString()}만`;
   return value.toLocaleString();
 }
 

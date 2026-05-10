@@ -12,7 +12,7 @@ const TEAM_COLORS: Record<string, string> = {
 function formatAmount(v: number) {
   if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}조원`;
   if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억원`;
-  return `${(v / 10_000).toFixed(0)}만원`;
+  return `${Math.round(v / 10_000).toLocaleString()}만원`;
 }
 
 const RADIAN = Math.PI / 180;

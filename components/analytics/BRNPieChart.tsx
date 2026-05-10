@@ -17,7 +17,7 @@ const COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#f87171", "#a78bfa"
 function formatAmount(v: number) {
   if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}조원`;
   if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억원`;
-  return `${(v / 10_000).toFixed(0)}만원`;
+  return `${Math.round(v / 10_000).toLocaleString()}만원`;
 }
 
 const RADIAN = Math.PI / 180;

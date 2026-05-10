@@ -12,14 +12,14 @@ export type GrowthItem = {
   changePct: number;
 };
 
-function truncate(s: string, n = 22) {
+function truncate(s: string, n = 32) {
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 
 function formatAmount(v: number) {
   if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}조`;
   if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`;
-  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}만`;
+  if (v >= 10_000) return `${Math.round(v / 10_000).toLocaleString()}만`;
   return v.toLocaleString();
 }
 
@@ -37,12 +37,12 @@ function SubChart({ data, color, title }: { data: GrowthItem[]; color: string; t
     <div>
       <p className="text-xs font-semibold mb-3" style={{ color }}>{title}</p>
       <ResponsiveContainer width="100%" height={h}>
-        <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 52, left: 0, bottom: 0 }}>
+        <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 56, left: 0, bottom: 0 }}>
           <XAxis type="number" hide />
           <YAxis
             dataKey="name"
             type="category"
-            width={176}
+            width={240}
             tick={{ fill: "#374151", fontSize: 11 }}
             axisLine={false}
             tickLine={false}

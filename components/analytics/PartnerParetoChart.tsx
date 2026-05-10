@@ -15,7 +15,7 @@ function truncate(s: string, n = 14) {
 function formatAmount(v: number) {
   if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}조`;
   if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`;
-  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}만`;
+  if (v >= 10_000) return `${Math.round(v / 10_000).toLocaleString()}만`;
   return v.toLocaleString();
 }
 
