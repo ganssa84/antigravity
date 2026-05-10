@@ -66,7 +66,7 @@ export default function BRNPieChart({ data }: { data: BrnTotal[] }) {
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
       <h3 className="text-sm font-semibold text-gray-700 mb-4">마켓플레이스별 매출 비중</h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={380}>
         <PieChart>
           <Pie
             data={chartData}
@@ -74,8 +74,8 @@ export default function BRNPieChart({ data }: { data: BrnTotal[] }) {
             nameKey="name"
             cx="50%"
             cy="50%"
-            innerRadius={55}
-            outerRadius={82}
+            innerRadius={70}
+            outerRadius={105}
             paddingAngle={2}
             label={renderLabel as never}
             labelLine={false}

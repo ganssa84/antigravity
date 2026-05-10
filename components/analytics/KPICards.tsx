@@ -72,9 +72,11 @@ type CardKey = typeof ALL_CARDS[number]["key"];
 export default function KPICards({
   kpi,
   visibleKeys = ["total_amount", "total_qty", "num_partners", "num_products"],
+  growthRate,
 }: {
   kpi: KPI | null;
   visibleKeys?: CardKey[];
+  growthRate?: number | null;
 }) {
   const cards = ALL_CARDS.filter((c) => visibleKeys.includes(c.key));
   return (
@@ -90,6 +92,12 @@ export default function KPICards({
             <div className="text-xl font-semibold text-gray-900">
               {value == null ? "—" : card.format(value)}
             </div>
+            {card.key === "total_amount" && growthRate != null && (
+              <div className={`flex items-center gap-1 mt-1.5 text-xs font-semibold ${growthRate >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                <span>{growthRate >= 0 ? "▲" : "▼"} {Math.abs(growthRate).toFixed(1)}%</span>
+                <span className="font-normal text-gray-400">평균 성장률</span>
+              </div>
+            )}
           </div>
         );
       })}

@@ -9,17 +9,26 @@ import YTDChart from "./YTDChart";
 import TopProductsChart from "./TopProductsChart";
 import TeamDonutChart from "./TeamDonutChart";
 import PartnerBarChart from "./PartnerBarChart";
-import BRNPieChart from "./BRNPieChart";
+import BRNPieChart, { MARKETPLACE_NAMES } from "./BRNPieChart";
 import CommodityCompareChart from "./CommodityCompareChart";
-import ProductTabView from "./ProductTabView";
 import UploadPanel, { type ProcessedData } from "./UploadPanel";
 
 const TEAMS = ["AAD", "ASD", "ISD", "EMD", "PSD", "IATD"] as const;
+const MARKETPLACE_BRNS = ["2208162517", "1208800767", "1198666372", "2208183676", "8158101244"] as const;
 
 const TEAM_COLORS: Record<string, string> = {
   AAD: "#fb923c", ASD: "#f87171", ISD: "#a78bfa",
   EMD: "#10b981", PSD: "#6366f1", IATD: "#f59e0b",
 };
+const MARKETPLACE_COLORS: Record<string, string> = {
+  "2208162517": "#03c75a",
+  "1208800767": "#ff6b00",
+  "1198666372": "#6366f1",
+  "2208183676": "#1a73e8",
+  "8158101244": "#e11d48",
+};
+
+type ProductBrnItem = { material: string; material_id: string; brn: string; amount: number };
 
 export default function DashboardClient({ initialTab = "overview" }: { initialTab?: string }) {
   const router = useRouter();
@@ -30,8 +39,11 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
 
   const allYears = rawData?.summary.years ?? [];
 
-  // "products" tab also uses ALL teams
-  const selectedTeam = (activeTab === "overview" || activeTab === "products") ? "ALL" : activeTab;
+  const isOverview = activeTab === "overview";
+  const isMarketplace = activeTab.startsWith("brn_");
+  const isTeam = !isOverview && !isMarketplace;
+  const selectedBrn = isMarketplace ? activeTab.replace("brn_", "") : "ALL";
+  const selectedTeam = isTeam ? activeTab : "ALL";
 
   const chartData = useMemo(() => {
     if (!rawData) return null;
@@ -43,6 +55,75 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     const filter = <T extends { home_team: string; year: number }>(d: T[]) =>
       byYear(byTeam(d));
 
+    // ── Marketplace view ──────────────────────────────────────────────────
+    if (isMarketplace) {
+      const brnYear = <T extends { year: number }>(d: T[]) =>
+        selectedYear === "ALL" ? d : d.filter(r => r.year === parseInt(selectedYear));
+
+      const brnAllData = rawData.brn.filter(r => r.brn === selectedBrn);
+      const brnFilt = brnYear(brnAllData);
+
+      const monthlyByYear: Record<number, { month: number; amount: number; qty: number }[]> = {};
+      for (const r of brnFilt) {
+        if (!monthlyByYear[r.year]) monthlyByYear[r.year] = [];
+        const ex = monthlyByYear[r.year].find(d => d.month === r.month);
+        if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+        else monthlyByYear[r.year].push({ month: r.month, amount: r.amount, qty: r.qty });
+      }
+      const monthlyByYearAll: Record<number, { month: number; amount: number; qty: number }[]> = {};
+      for (const r of brnAllData) {
+        if (!monthlyByYearAll[r.year]) monthlyByYearAll[r.year] = [];
+        const ex = monthlyByYearAll[r.year].find(d => d.month === r.month);
+        if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+        else monthlyByYearAll[r.year].push({ month: r.month, amount: r.amount, qty: r.qty });
+      }
+
+      const yearlyMap = new Map<number, number>();
+      for (const r of brnFilt) yearlyMap.set(r.year, (yearlyMap.get(r.year) ?? 0) + r.amount);
+      const yearly = Array.from(yearlyMap.entries()).sort((a, b) => a[0] - b[0]).map(([year, amount]) => ({ year, amount, qty: 0 }));
+
+      const yearlyAllMap = new Map<number, number>();
+      for (const r of brnAllData) yearlyAllMap.set(r.year, (yearlyAllMap.get(r.year) ?? 0) + r.amount);
+      const yearlyAllArr = Array.from(yearlyAllMap.entries()).sort((a, b) => a[0] - b[0]);
+
+      const ppFilt = brnYear(rawData.partnerProducts.filter(r => r.brn === selectedBrn));
+      const productMap = new Map<string, { material: string; material_id: string; amount: number; qty: number }>();
+      for (const r of ppFilt) {
+        const ex = productMap.get(r.material_id);
+        if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+        else productMap.set(r.material_id, { material: r.material, material_id: r.material_id, amount: r.amount, qty: r.qty });
+      }
+      const products = Array.from(productMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 50);
+
+      const pbFilt = brnYear(rawData.partnerBrn.filter(r => r.brn === selectedBrn));
+      const teamMap = new Map<string, { home_team: string; amount: number; qty: number }>();
+      for (const r of pbFilt) {
+        const ex = teamMap.get(r.home_team);
+        if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+        else teamMap.set(r.home_team, { home_team: r.home_team, amount: r.amount, qty: r.qty });
+      }
+      const teams = Array.from(teamMap.values()).sort((a, b) => b.amount - a.amount);
+
+      const kpi = {
+        total_amount: Math.round(brnFilt.reduce((s, r) => s + r.amount, 0)),
+        total_qty: Math.round(brnFilt.reduce((s, r) => s + r.qty, 0) * 100) / 100,
+        num_partners: new Set(pbFilt.map(r => r.partner_name)).size,
+        num_products: new Set(ppFilt.map(r => r.material_id)).size,
+      };
+
+      let growthRate: number | null = null;
+      if (yearlyAllArr.length >= 2) {
+        const rates: number[] = [];
+        for (let i = 1; i < yearlyAllArr.length; i++) {
+          if (yearlyAllArr[i - 1][1] > 0) rates.push((yearlyAllArr[i][1] - yearlyAllArr[i - 1][1]) / yearlyAllArr[i - 1][1]);
+        }
+        if (rates.length > 0) growthRate = (rates.reduce((s, r) => s + r, 0) / rates.length) * 100;
+      }
+
+      return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn: [] as ProductBrnItem[], partners: [] as { partner_name: string; amount: number; qty: number; num_products: number }[], teams, brnTotals: [] as { brn: string; amount: number; qty: number }[], kpi, partnerBrn: pbFilt, partnerProducts: ppFilt, growthRate };
+    }
+
+    // ── Overview / Team view ───────────────────────────────────────────────
     const monthlyFiltered = filter(rawData.monthly);
     const monthlyByYear: Record<number, { month: number; amount: number; qty: number }[]> = {};
     for (const r of monthlyFiltered) {
@@ -58,7 +139,6 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       .sort((a, b) => a[0] - b[0])
       .map(([year, amount]) => ({ year, amount, qty: 0 }));
 
-    // For YTD chart: team-filtered only, all years always shown
     const monthlyByYearAll: Record<number, { month: number; amount: number; qty: number }[]> = {};
     for (const r of byTeam(rawData.monthly)) {
       if (!monthlyByYearAll[r.year]) monthlyByYearAll[r.year] = [];
@@ -75,7 +155,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     }
     const products = Array.from(productMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 50);
 
-    const productBrnMap = new Map<string, { material: string; material_id: string; brn: string; amount: number }>();
+    const productBrnMap = new Map<string, ProductBrnItem>();
     for (const r of filter(rawData.partnerProducts)) {
       const k = `${r.material_id}|${r.brn}`;
       const ex = productBrnMap.get(k);
@@ -120,27 +200,37 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     const partnerBrn = filter(rawData.partnerBrn);
     const partnerProducts = filter(rawData.partnerProducts);
 
-    return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts };
-  }, [rawData, selectedTeam, selectedYear]);
+    // Average YoY growth rate (all years, team-filtered)
+    const yearlyAllArr = Object.entries(monthlyByYearAll)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([, months]) => months.reduce((s, m) => s + m.amount, 0));
+    let growthRate: number | null = null;
+    if (yearlyAllArr.length >= 2) {
+      const rates: number[] = [];
+      for (let i = 1; i < yearlyAllArr.length; i++) {
+        if (yearlyAllArr[i - 1] > 0) rates.push((yearlyAllArr[i] - yearlyAllArr[i - 1]) / yearlyAllArr[i - 1]);
+      }
+      if (rates.length > 0) growthRate = (rates.reduce((s, r) => s + r, 0) / rates.length) * 100;
+    }
+
+    return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts, growthRate };
+  }, [rawData, selectedTeam, selectedYear, isMarketplace, selectedBrn]);
 
   const commodityMonthlyByTeam = useMemo(() => {
-    if (!rawData) return [];
+    if (!rawData || isMarketplace) return [];
     return selectedTeam === "ALL"
       ? rawData.commodityMonthly
       : rawData.commodityMonthly.filter(r => r.home_team === selectedTeam);
-  }, [rawData, selectedTeam]);
+  }, [rawData, selectedTeam, isMarketplace]);
 
   async function handleLogout() {
     await fetch("/api/analytics/auth", { method: "DELETE" });
     router.push("/analytics/login");
   }
 
-  const isOverview = activeTab === "overview";
-  const isProducts = activeTab === "products";
-  const isTeam = !isOverview && !isProducts;
-
-  const pageTitle = isOverview ? "Overview" : isProducts ? "취급제품" : activeTab;
-  const pageSubtitle = isOverview ? "전체 현황" : isProducts ? "제품 현황 및 트렌드" : `${activeTab} Home Team`;
+  const mpName = isMarketplace ? (MARKETPLACE_NAMES[selectedBrn] || selectedBrn) : "";
+  const pageTitle = isOverview ? "Overview" : isMarketplace ? mpName : activeTab;
+  const pageSubtitle = isOverview ? "전체 현황" : isMarketplace ? "마켓플레이스 현황" : `${activeTab} Home Team`;
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#f8fafc]">
@@ -176,23 +266,27 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
             Overview
           </button>
 
-          {/* 취급제품 */}
-          <button
-            onClick={() => setActiveTab("products")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-              isProducts ? "bg-indigo-50 text-indigo-700 font-medium" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            취급제품
-          </button>
+          {/* Marketplaces */}
+          <div className="pt-4 pb-1.5 px-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Marketplaces</p>
+          </div>
+          {MARKETPLACE_BRNS.map((brn) => (
+            <button
+              key={brn}
+              onClick={() => setActiveTab(`brn_${brn}`)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                activeTab === `brn_${brn}` ? "bg-indigo-50 text-indigo-700 font-medium" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: MARKETPLACE_COLORS[brn] }} />
+              {MARKETPLACE_NAMES[brn] || brn}
+            </button>
+          ))}
 
+          {/* Home Teams */}
           <div className="pt-4 pb-1.5 px-3">
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Home Teams</p>
           </div>
-
           {TEAMS.map((team) => (
             <button
               key={team}
@@ -256,7 +350,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
               </div>
             )}
 
-            {/* Page header — sticky so year filter stays visible while scrolling */}
+            {/* Sticky page header */}
             <div className="sticky top-0 z-20 bg-[#f8fafc] px-8 pt-5 pb-3 flex items-start justify-between border-b border-gray-100">
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">{pageTitle}</h1>
@@ -264,7 +358,6 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                   {pageSubtitle}{selectedYear !== "ALL" && ` · ${selectedYear}년`}
                 </p>
               </div>
-              {/* Year filter */}
               <div className="flex gap-1 bg-gray-100 rounded-xl p-1 shrink-0">
                 <button
                   onClick={() => setSelectedYear("ALL")}
@@ -288,24 +381,13 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
               </div>
             </div>
 
-            {/* 취급제품 tab */}
-            {isProducts && (
-              <div className="px-8 pb-10 pt-4">
-                <ProductTabView
-                  products={rawData.products}
-                  years={rawData.summary.years}
-                  selectedYear={selectedYear}
-                />
-              </div>
-            )}
-
-            {/* Overview & Team tabs */}
-            {!isProducts && chartData && (
+            {/* Dashboard content */}
+            {chartData && (
               <div className="px-8 pb-10 pt-4 space-y-5">
-                {/* KPI: overview shows 총매출 only; team shows all 4 */}
                 <KPICards
                   kpi={chartData.kpi}
                   visibleKeys={isOverview ? ["total_amount"] : ["total_amount", "total_qty", "num_partners", "num_products"]}
+                  growthRate={isOverview || isTeam ? chartData.growthRate : null}
                 />
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
@@ -315,10 +397,9 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                   <YearlyBarChart data={chartData.yearly} />
                 </div>
 
-                {/* YTD period comparison — always shows all years */}
                 <YTDChart byYear={chartData.monthlyByYearAll} />
 
-                {isOverview ? (
+                {isOverview && (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <TeamDonutChart data={chartData.teams} />
@@ -327,7 +408,17 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                   </>
-                ) : (
+                )}
+
+                {isMarketplace && (
+                  <>
+                    <TeamDonutChart data={chartData.teams} />
+                    <TopProductsChart data={chartData.products} productBrn={[]} />
+                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
+                  </>
+                )}
+
+                {isTeam && (
                   <>
                     <CommodityCompareChart
                       data={commodityMonthlyByTeam}
