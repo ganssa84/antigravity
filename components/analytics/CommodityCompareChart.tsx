@@ -13,10 +13,10 @@ type CommodityRow = {
 };
 
 function formatAmount(v: number) {
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}조`;
   if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}M`;
-  return `${(v / 10_000).toFixed(0)}만`;
+  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}만`;
+  return v.toLocaleString();
 }
 
 // Custom label rendered at the end of the current-year bar

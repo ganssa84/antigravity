@@ -8,19 +8,16 @@ type MonthlyPoint = { month: number; amount: number; qty: number };
 type ByYear = Record<number, MonthlyPoint[]>;
 
 const YEAR_COLORS: Record<number, string> = {
-  2023: "#6366f1",
-  2024: "#0ea5e9",
-  2025: "#10b981",
-  2026: "#f59e0b",
+  2023: "#6366f1", 2024: "#0ea5e9", 2025: "#10b981", 2026: "#f59e0b",
 };
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function formatAmount(v: number) {
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}조`;
   if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  return `${(v / 10_000).toFixed(0)}만`;
+  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}만`;
+  return v.toLocaleString();
 }
 
 export default function MonthlySalesChart({ byYear }: { byYear: ByYear }) {

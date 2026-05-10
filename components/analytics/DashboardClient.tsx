@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import KPICards from "./KPICards";
 import MonthlySalesChart from "./MonthlySalesChart";
 import YearlyBarChart from "./YearlyBarChart";
+import YTDChart from "./YTDChart";
 import TopProductsChart from "./TopProductsChart";
 import TeamDonutChart from "./TeamDonutChart";
 import PartnerBarChart from "./PartnerBarChart";
 import BRNPieChart from "./BRNPieChart";
 import CommodityCompareChart from "./CommodityCompareChart";
+import ProductTabView from "./ProductTabView";
 import UploadPanel, { type ProcessedData } from "./UploadPanel";
 
 const TEAMS = ["AAD", "ASD", "ISD", "EMD", "PSD", "IATD"] as const;
@@ -27,7 +29,9 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
   const [showUpload, setShowUpload] = useState(false);
 
   const allYears = rawData?.summary.years ?? [];
-  const selectedTeam = activeTab === "overview" ? "ALL" : activeTab;
+
+  // "products" tab also uses ALL teams
+  const selectedTeam = (activeTab === "overview" || activeTab === "products") ? "ALL" : activeTab;
 
   const chartData = useMemo(() => {
     if (!rawData) return null;
@@ -126,6 +130,13 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     router.push("/analytics/login");
   }
 
+  const isOverview = activeTab === "overview";
+  const isProducts = activeTab === "products";
+  const isTeam = !isOverview && !isProducts;
+
+  const pageTitle = isOverview ? "Overview" : isProducts ? "취급제품" : activeTab;
+  const pageSubtitle = isOverview ? "전체 현황" : isProducts ? "제품 현황 및 트렌드" : `${activeTab} Home Team`;
+
   return (
     <div className="flex min-h-screen bg-[#f8fafc]">
       {/* Sidebar */}
@@ -147,18 +158,30 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {/* Overview */}
           <button
             onClick={() => setActiveTab("overview")}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-              activeTab === "overview"
-                ? "bg-indigo-50 text-indigo-700 font-medium"
-                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              isOverview ? "bg-indigo-50 text-indigo-700 font-medium" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             }`}
           >
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
             Overview
+          </button>
+
+          {/* 취급제품 */}
+          <button
+            onClick={() => setActiveTab("products")}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+              isProducts ? "bg-indigo-50 text-indigo-700 font-medium" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            취급제품
           </button>
 
           <div className="pt-4 pb-1.5 px-3">
@@ -170,21 +193,16 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
               key={team}
               onClick={() => setActiveTab(team)}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                activeTab === team
-                  ? "bg-indigo-50 text-indigo-700 font-medium"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                activeTab === team ? "bg-indigo-50 text-indigo-700 font-medium" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: TEAM_COLORS[team] }}
-              />
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: TEAM_COLORS[team] }} />
               {team}
             </button>
           ))}
         </nav>
 
-        {/* Bottom actions */}
+        {/* Bottom */}
         <div className="px-3 py-3 border-t border-gray-100 space-y-0.5">
           {rawData && (
             <button
@@ -236,15 +254,11 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
             {/* Page header */}
             <div className="px-8 pt-6 pb-2 flex items-start justify-between">
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">
-                  {activeTab === "overview" ? "Overview" : activeTab}
-                </h1>
+                <h1 className="text-xl font-semibold text-gray-900">{pageTitle}</h1>
                 <p className="text-sm text-gray-400 mt-0.5">
-                  {activeTab === "overview" ? "전체 현황" : `${activeTab} Home Team`}
-                  {selectedYear !== "ALL" && ` · ${selectedYear}년`}
+                  {pageSubtitle}{selectedYear !== "ALL" && ` · ${selectedYear}년`}
                 </p>
               </div>
-
               {/* Year filter */}
               <div className="flex gap-1 bg-gray-100 rounded-xl p-1 shrink-0">
                 <button
@@ -269,9 +283,25 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
               </div>
             </div>
 
-            {chartData && (
+            {/* 취급제품 tab */}
+            {isProducts && (
+              <div className="px-8 pb-10 pt-4">
+                <ProductTabView
+                  products={rawData.products}
+                  years={rawData.summary.years}
+                  selectedYear={selectedYear}
+                />
+              </div>
+            )}
+
+            {/* Overview & Team tabs */}
+            {!isProducts && chartData && (
               <div className="px-8 pb-10 pt-4 space-y-5">
-                <KPICards kpi={chartData.kpi} />
+                {/* KPI: overview shows 총매출 only; team shows all 4 */}
+                <KPICards
+                  kpi={chartData.kpi}
+                  visibleKeys={isOverview ? ["total_amount"] : ["total_amount", "total_qty", "num_partners", "num_products"]}
+                />
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
                   <div className="xl:col-span-2">
@@ -280,17 +310,15 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                   <YearlyBarChart data={chartData.yearly} />
                 </div>
 
-                {activeTab === "overview" ? (
+                {/* YTD period comparison */}
+                <YTDChart byYear={chartData.monthlyByYear} />
+
+                {isOverview ? (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <TeamDonutChart data={chartData.teams} />
                       <BRNPieChart data={chartData.brnTotals} />
                     </div>
-                    <CommodityCompareChart
-                      data={chartData.commodityCompare}
-                      currentYear={chartData.currentYr}
-                      prevYear={chartData.prevYr}
-                    />
                     <TopProductsChart data={chartData.products} />
                     <PartnerBarChart data={chartData.partners} />
                   </>

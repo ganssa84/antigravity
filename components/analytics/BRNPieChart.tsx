@@ -1,6 +1,6 @@
 "use client";
 
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 type BrnTotal = { brn: string; amount: number; qty: number };
 
@@ -15,10 +15,32 @@ export const MARKETPLACE_NAMES: Record<string, string> = {
 const COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#f87171", "#a78bfa"];
 
 function formatAmount(v: number) {
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B원`;
+  if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}조원`;
   if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억원`;
   return `${(v / 10_000).toFixed(0)}만원`;
 }
+
+const RADIAN = Math.PI / 180;
+
+const renderLabel = (props: Record<string, unknown>) => {
+  const { cx, cy, midAngle, outerRadius, name, percent } = props;
+  if ((percent as number) < 0.04) return null;
+  const r = (outerRadius as number) + 22;
+  const x = (cx as number) + r * Math.cos(-(midAngle as number) * RADIAN);
+  const y = (cy as number) + r * Math.sin(-(midAngle as number) * RADIAN);
+  return (
+    <text
+      x={x} y={y}
+      fill="#374151"
+      textAnchor={x > (cx as number) ? "start" : "end"}
+      dominantBaseline="central"
+      fontSize={11}
+      fontWeight={500}
+    >
+      {name as string}
+    </text>
+  );
+};
 
 export default function BRNPieChart({ data }: { data: BrnTotal[] }) {
   const total = data.reduce((s, r) => s + r.amount, 0);
@@ -30,7 +52,7 @@ export default function BRNPieChart({ data }: { data: BrnTotal[] }) {
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
       <h3 className="text-sm font-semibold text-gray-700 mb-4">마켓플레이스별 매출 비중</h3>
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
             data={chartData}
@@ -38,9 +60,11 @@ export default function BRNPieChart({ data }: { data: BrnTotal[] }) {
             nameKey="name"
             cx="50%"
             cy="50%"
-            innerRadius={60}
-            outerRadius={100}
+            innerRadius={58}
+            outerRadius={95}
             paddingAngle={2}
+            label={renderLabel as never}
+            labelLine={false}
           >
             {chartData.map((_, i) => (
               <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -53,7 +77,6 @@ export default function BRNPieChart({ data }: { data: BrnTotal[] }) {
               return [`${formatAmount(n)} (${((n / total) * 100).toFixed(1)}%)`, "매출"];
             }}
           />
-          <Legend formatter={(value) => <span style={{ color: "#6b7280", fontSize: 12 }}>{value}</span>} />
         </PieChart>
       </ResponsiveContainer>
     </div>

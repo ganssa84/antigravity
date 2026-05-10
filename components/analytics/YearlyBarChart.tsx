@@ -9,9 +9,10 @@ type YearlyStat = { year: number; amount: number; qty: number };
 const COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b"];
 
 function formatAmount(v: number) {
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}조`;
   if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`;
-  return `${(v / 10_000).toFixed(0)}만`;
+  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}만`;
+  return v.toLocaleString();
 }
 
 export default function YearlyBarChart({ data }: { data: YearlyStat[] }) {
