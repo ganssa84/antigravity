@@ -12,6 +12,9 @@ import PartnerBarChart from "./PartnerBarChart";
 import BRNPieChart, { MARKETPLACE_NAMES } from "./BRNPieChart";
 import CommodityCompareChart from "./CommodityCompareChart";
 import UploadPanel, { type ProcessedData } from "./UploadPanel";
+import MarketplaceTrendChart from "./MarketplaceTrendChart";
+import ProductGrowthChart, { type GrowthItem } from "./ProductGrowthChart";
+import PartnerParetoChart from "./PartnerParetoChart";
 
 const TEAMS = ["AAD", "ASD", "ISD", "EMD", "PSD", "IATD"] as const;
 const MARKETPLACE_BRNS = ["2208162517", "1208800767", "1198666372", "2208183676", "8158101244"] as const;
@@ -120,7 +123,42 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
         if (rates.length > 0) growthRate = (rates.reduce((s, r) => s + r, 0) / rates.length) * 100;
       }
 
-      return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn: [] as ProductBrnItem[], partners: [] as { partner_name: string; amount: number; qty: number; num_products: number }[], teams, brnTotals: [] as { brn: string; amount: number; qty: number }[], kpi, partnerBrn: pbFilt, partnerProducts: ppFilt, growthRate };
+      // Product YoY growth for marketplace
+      const brnYears = [...new Set(brnAllData.map((r) => r.year))].sort();
+      const growthTargetYear = brnYears.at(-1) ?? 0;
+      const growthPrevYear = brnYears.at(-2) ?? 0;
+      const topGrowing: GrowthItem[] = [];
+      const topDeclining: GrowthItem[] = [];
+      if (growthPrevYear && growthTargetYear) {
+        const curPMap = new Map<string, { material: string; amount: number }>();
+        const prevPMap = new Map<string, { material: string; amount: number }>();
+        for (const r of rawData.partnerProducts.filter((r2) => r2.brn === selectedBrn)) {
+          const map = r.year === growthTargetYear ? curPMap : r.year === growthPrevYear ? prevPMap : null;
+          if (!map) continue;
+          const ex = map.get(r.material_id);
+          if (ex) ex.amount += r.amount;
+          else map.set(r.material_id, { material: r.material, amount: r.amount });
+        }
+        const items: GrowthItem[] = [];
+        for (const [mid, cur] of curPMap) {
+          const prev = prevPMap.get(mid);
+          if (!prev || prev.amount === 0 || cur.amount < 5_000_000) continue;
+          items.push({ material: cur.material, material_id: mid, currentAmount: cur.amount, prevAmount: prev.amount, changePct: (cur.amount - prev.amount) / prev.amount * 100 });
+        }
+        topGrowing.push(...items.filter((g) => g.changePct > 0).sort((a, b) => b.changePct - a.changePct).slice(0, 10));
+        topDeclining.push(...items.filter((g) => g.changePct < 0).sort((a, b) => a.changePct - b.changePct).slice(0, 10));
+      }
+
+      // All partners for Pareto (no year filter for full picture)
+      const partnersAllBrnMap = new Map<string, { partner_name: string; amount: number }>();
+      for (const r of rawData.partnerBrn.filter((r2) => r2.brn === selectedBrn)) {
+        const ex = partnersAllBrnMap.get(r.partner_name);
+        if (ex) ex.amount += r.amount;
+        else partnersAllBrnMap.set(r.partner_name, { partner_name: r.partner_name, amount: r.amount });
+      }
+      const partnersAll = Array.from(partnersAllBrnMap.values()).sort((a, b) => b.amount - a.amount);
+
+      return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn: [] as ProductBrnItem[], partners: [] as { partner_name: string; amount: number; qty: number; num_products: number }[], teams, brnTotals: [] as { brn: string; amount: number; qty: number }[], kpi, partnerBrn: pbFilt, partnerProducts: ppFilt, growthRate, mpTrendData: [] as Record<string, number | string>[], partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear };
     }
 
     // ── Overview / Team view ───────────────────────────────────────────────
@@ -213,7 +251,53 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       if (rates.length > 0) growthRate = (rates.reduce((s, r) => s + r, 0) / rates.length) * 100;
     }
 
-    return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts, growthRate };
+    // Marketplace share trend (% of total per year)
+    const mpTrendMap: Record<number, Record<string, number>> = {};
+    for (const r of byTeam(rawData.brn)) {
+      if (!mpTrendMap[r.year]) mpTrendMap[r.year] = {};
+      mpTrendMap[r.year][r.brn] = (mpTrendMap[r.year][r.brn] || 0) + r.amount;
+    }
+    const mpTrendData = Object.entries(mpTrendMap)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([yr, brnMap]) => {
+        const total = Object.values(brnMap).reduce((s, v) => s + v, 0);
+        const row: Record<string, number | string> = { year: Number(yr) };
+        for (const brn of MARKETPLACE_BRNS) {
+          row[MARKETPLACE_NAMES[brn]] = total > 0 ? Math.round((brnMap[brn] || 0) / total * 1000) / 10 : 0;
+        }
+        return row;
+      });
+
+    // All partners for Pareto (unsliced)
+    const partnersAll = Array.from(partnerMap.values()).sort((a, b) => b.amount - a.amount);
+
+    // Product YoY growth
+    const sortedYearsArr = [...allYears].sort();
+    const growthTargetYear = sortedYearsArr.at(-1) ?? 0;
+    const growthPrevYear = sortedYearsArr.at(-2) ?? 0;
+    const topGrowing: GrowthItem[] = [];
+    const topDeclining: GrowthItem[] = [];
+    if (growthPrevYear && growthTargetYear) {
+      const curPMap = new Map<string, { material: string; amount: number }>();
+      const prevPMap = new Map<string, { material: string; amount: number }>();
+      for (const r of byTeam(rawData.products)) {
+        const map = r.year === growthTargetYear ? curPMap : r.year === growthPrevYear ? prevPMap : null;
+        if (!map) continue;
+        const ex = map.get(r.material_id);
+        if (ex) ex.amount += r.amount;
+        else map.set(r.material_id, { material: r.material, amount: r.amount });
+      }
+      const items: GrowthItem[] = [];
+      for (const [mid, cur] of curPMap) {
+        const prev = prevPMap.get(mid);
+        if (!prev || prev.amount === 0 || cur.amount < 5_000_000) continue;
+        items.push({ material: cur.material, material_id: mid, currentAmount: cur.amount, prevAmount: prev.amount, changePct: (cur.amount - prev.amount) / prev.amount * 100 });
+      }
+      topGrowing.push(...items.filter((g) => g.changePct > 0).sort((a, b) => b.changePct - a.changePct).slice(0, 10));
+      topDeclining.push(...items.filter((g) => g.changePct < 0).sort((a, b) => a.changePct - b.changePct).slice(0, 10));
+    }
+
+    return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts, growthRate, mpTrendData, partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear };
   }, [rawData, selectedTeam, selectedYear, isMarketplace, selectedBrn]);
 
   const commodityMonthlyByTeam = useMemo(() => {
@@ -387,7 +471,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                 <KPICards
                   kpi={chartData.kpi}
                   visibleKeys={isOverview ? ["total_amount"] : ["total_amount", "total_qty", "num_partners", "num_products"]}
-                  growthRate={isOverview || isTeam ? chartData.growthRate : null}
+                  growthRate={chartData.growthRate}
                 />
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
@@ -405,8 +489,11 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                       <TeamDonutChart data={chartData.teams} />
                       <BRNPieChart data={chartData.brnTotals} />
                     </div>
+                    <MarketplaceTrendChart data={chartData.mpTrendData} />
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
+                    <ProductGrowthChart topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining} currentYear={chartData.growthTargetYear} prevYear={chartData.growthPrevYear} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
+                    <PartnerParetoChart data={chartData.partnersAll} />
                   </>
                 )}
 
@@ -414,7 +501,9 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                   <>
                     <TeamDonutChart data={chartData.teams} />
                     <TopProductsChart data={chartData.products} productBrn={[]} />
+                    <ProductGrowthChart topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining} currentYear={chartData.growthTargetYear} prevYear={chartData.growthPrevYear} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
+                    <PartnerParetoChart data={chartData.partnersAll} />
                   </>
                 )}
 
@@ -425,7 +514,9 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                       allYears={rawData.summary.years}
                     />
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
+                    <ProductGrowthChart topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining} currentYear={chartData.growthTargetYear} prevYear={chartData.growthPrevYear} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
+                    <PartnerParetoChart data={chartData.partnersAll} />
                     <BRNPieChart data={chartData.brnTotals} />
                   </>
                 )}
