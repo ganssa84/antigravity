@@ -58,13 +58,31 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       .sort((a, b) => a[0] - b[0])
       .map(([year, amount]) => ({ year, amount, qty: 0 }));
 
+    // For YTD chart: team-filtered only, all years always shown
+    const monthlyByYearAll: Record<number, { month: number; amount: number; qty: number }[]> = {};
+    for (const r of byTeam(rawData.monthly)) {
+      if (!monthlyByYearAll[r.year]) monthlyByYearAll[r.year] = [];
+      const ex = monthlyByYearAll[r.year].find((d) => d.month === r.month);
+      if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
+      else monthlyByYearAll[r.year].push({ month: r.month, amount: r.amount, qty: r.qty });
+    }
+
     const productMap = new Map<string, { material: string; material_id: string; amount: number; qty: number }>();
     for (const r of filter(rawData.products)) {
       const ex = productMap.get(r.material_id);
       if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
       else productMap.set(r.material_id, { material: r.material, material_id: r.material_id, amount: r.amount, qty: r.qty });
     }
-    const products = Array.from(productMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 15);
+    const products = Array.from(productMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 50);
+
+    const productBrnMap = new Map<string, { material: string; material_id: string; brn: string; amount: number }>();
+    for (const r of filter(rawData.partnerProducts)) {
+      const k = `${r.material_id}|${r.brn}`;
+      const ex = productBrnMap.get(k);
+      if (ex) ex.amount += r.amount;
+      else productBrnMap.set(k, { material: r.material, material_id: r.material_id, brn: r.brn, amount: r.amount });
+    }
+    const productBrn = Array.from(productBrnMap.values());
 
     const partnerMap = new Map<string, { partner_name: string; amount: number; qty: number; num_products: number }>();
     for (const r of filter(rawData.partners)) {
@@ -102,7 +120,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     const partnerBrn = filter(rawData.partnerBrn);
     const partnerProducts = filter(rawData.partnerProducts);
 
-    return { monthlyByYear, yearly, products, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts };
+    return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts };
   }, [rawData, selectedTeam, selectedYear]);
 
   const commodityMonthlyByTeam = useMemo(() => {
@@ -238,8 +256,8 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
               </div>
             )}
 
-            {/* Page header */}
-            <div className="px-8 pt-6 pb-2 flex items-start justify-between">
+            {/* Page header — sticky so year filter stays visible while scrolling */}
+            <div className="sticky top-0 z-20 bg-[#f8fafc] px-8 pt-5 pb-3 flex items-start justify-between border-b border-gray-100">
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">{pageTitle}</h1>
                 <p className="text-sm text-gray-400 mt-0.5">
@@ -297,8 +315,8 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                   <YearlyBarChart data={chartData.yearly} />
                 </div>
 
-                {/* YTD period comparison */}
-                <YTDChart byYear={chartData.monthlyByYear} />
+                {/* YTD period comparison — always shows all years */}
+                <YTDChart byYear={chartData.monthlyByYearAll} />
 
                 {isOverview ? (
                   <>
@@ -306,7 +324,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                       <TeamDonutChart data={chartData.teams} />
                       <BRNPieChart data={chartData.brnTotals} />
                     </div>
-                    <TopProductsChart data={chartData.products} />
+                    <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                   </>
                 ) : (
@@ -315,7 +333,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                       data={commodityMonthlyByTeam}
                       allYears={rawData.summary.years}
                     />
-                    <TopProductsChart data={chartData.products} />
+                    <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                     <BRNPieChart data={chartData.brnTotals} />
                   </>

@@ -19,7 +19,7 @@ const RADIAN = Math.PI / 180;
 
 const renderLabel = (props: Record<string, unknown>) => {
   const { cx, cy, midAngle, outerRadius, name, percent } = props;
-  if ((percent as number) < 0.02) return null;
+  if ((percent as number) < 0.005) return null;
   const angle = -(midAngle as number) * RADIAN;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
