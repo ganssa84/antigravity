@@ -50,7 +50,7 @@ const renderLabel = (props: Record<string, unknown>) => {
         fontSize={11}
         fontWeight={500}
       >
-        {name as string}
+        {name as string} <tspan fill="#9ca3af" fontWeight={400}>{((percent as number) * 100).toFixed(1)}%</tspan>
       </text>
     </g>
   );
