@@ -137,10 +137,10 @@ export default function CommodityCompareChart({
   const barSize = mode === "yearly" ? 10 : undefined;
   const yearlyChartHeight = Math.max(280, topCommodities.length * (allYears.length * 12 + 14) + 60);
 
-  const handleYearlyClick = (d: Record<string, unknown>) => {
-    const payload = (d?.activePayload as { payload: { name: string } }[] | undefined)?.[0]?.payload;
-    if (!payload) return;
-    const comm = nameToComm.get(payload.name);
+  const handleBarClick = (rowData: Record<string, unknown>) => {
+    const name = rowData?.name as string | undefined;
+    if (!name) return;
+    const comm = nameToComm.get(name);
     if (comm === undefined) return;
     setSelectedCommodity(prev => prev === comm ? null : comm);
   };
@@ -213,8 +213,6 @@ export default function CommodityCompareChart({
             margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
             barGap={2}
             barCategoryGap="25%"
-            onClick={handleYearlyClick}
-            style={{ cursor: "pointer" }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
             <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={formatAmount} />
@@ -241,7 +239,15 @@ export default function CommodityCompareChart({
             />
             <Legend wrapperStyle={{ fontSize: 12, color: "#6b7280" }} />
             {allYears.map((y, i) => (
-              <Bar key={y} dataKey={`${y}년`} fill={YEAR_COLORS[i % YEAR_COLORS.length]} radius={[0, 2, 2, 0]} barSize={barSize} />
+              <Bar
+                key={y}
+                dataKey={`${y}년`}
+                fill={YEAR_COLORS[i % YEAR_COLORS.length]}
+                radius={[0, 2, 2, 0]}
+                barSize={barSize}
+                style={{ cursor: "pointer" }}
+                onClick={(d) => handleBarClick(d as unknown as Record<string, unknown>)}
+              />
             ))}
           </BarChart>
         </ResponsiveContainer>
