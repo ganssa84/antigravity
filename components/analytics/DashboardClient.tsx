@@ -111,7 +111,10 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
 
       const yearlyAllMap = new Map<number, number>();
       for (const r of brnAllData) yearlyAllMap.set(r.year, (yearlyAllMap.get(r.year) ?? 0) + r.amount);
-      const yearlyAllArr = Array.from(yearlyAllMap.entries()).sort((a, b) => a[0] - b[0]);
+      // Exclude partial years (< 12 months) from growth rate to avoid distortion
+      const yearlyAllArr = Array.from(yearlyAllMap.entries())
+        .sort((a, b) => a[0] - b[0])
+        .filter(([yr]) => (monthlyByYearAll[yr]?.length ?? 0) >= 12);
 
       const ppFilt = brnYear(rawData.partnerProducts.filter(r => r.brn === selectedBrn));
       const productMap = new Map<string, { material: string; material_id: string; amount: number; qty: number }>();
@@ -318,9 +321,10 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     const partnerBrn = filter(rawData.partnerBrn);
     const partnerProducts = filter(rawData.partnerProducts);
 
-    // Average YoY growth rate (all years, team-filtered)
+    // Average YoY growth rate — only complete years (12 months) to avoid partial-year distortion
     const yearlyAllArr = Object.entries(monthlyByYearAll)
       .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .filter(([, months]) => months.length >= 12)
       .map(([, months]) => months.reduce((s, m) => s + m.amount, 0));
     let growthRate: number | null = null;
     if (yearlyAllArr.length >= 2) {
