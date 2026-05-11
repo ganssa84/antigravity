@@ -29,16 +29,22 @@ function formatAmountShort(v: number) {
   return `${(v / 10_000).toFixed(0)}만`;
 }
 
+type PartnerProductMonthlyRow = PartnerProductRow & { month: number };
+
 export default function PartnerBarChart({
   partnerBrn,
   partnerProducts,
   yoyTargetYear,
   yoyPrevYear,
+  yoyMonths,
+  partnerProductsMonthly,
 }: {
   partnerBrn: PartnerBrnRow[];
   partnerProducts: PartnerProductRow[];
   yoyTargetYear?: number;
   yoyPrevYear?: number;
+  yoyMonths?: number[] | null;
+  partnerProductsMonthly?: PartnerProductMonthlyRow[];
 }) {
   const [selectedBrn, setSelectedBrn] = useState<string>("ALL");
   const [expandedPartner, setExpandedPartner] = useState<string | null>(null);
@@ -60,30 +66,50 @@ export default function PartnerBarChart({
 
   const expandedProducts = useMemo(() => {
     if (!expandedPartner) return [] as { material: string; amount: number; yoy: number | null }[];
-    const filtered = partnerProducts.filter(r => {
+
+    const filterRow = (r: { partner_name: string; brn: string; home_team: string }) => {
       if (r.partner_name !== expandedPartner) return false;
       if (selectedBrn !== "ALL" && r.brn !== selectedBrn) return false;
       if (detailTeam !== "ALL" && r.home_team !== detailTeam) return false;
       return true;
-    });
+    };
 
-    const dataYears = [...new Set(filtered.map(r => r.year))].sort((a, b) => a - b);
-    const tgtYear = yoyTargetYear ?? dataYears.at(-1) ?? 0;
-    const prvYear = yoyPrevYear ?? dataYears.at(-2) ?? 0;
-
+    const tgtYear = yoyTargetYear ?? 0;
+    const prvYear = yoyPrevYear ?? 0;
     if (!tgtYear) return [];
 
     const curMap = new Map<string, { material: string; amount: number }>();
     const prevMap = new Map<string, { material: string; amount: number }>();
-    for (const r of filtered) {
-      if (r.year === tgtYear) {
-        const ex = curMap.get(r.material_id);
-        if (ex) ex.amount += r.amount;
-        else curMap.set(r.material_id, { material: r.material, amount: r.amount });
-      } else if (prvYear && r.year === prvYear) {
-        const ex = prevMap.get(r.material_id);
-        if (ex) ex.amount += r.amount;
-        else prevMap.set(r.material_id, { material: r.material, amount: r.amount });
+
+    if (partnerProductsMonthly && partnerProductsMonthly.length > 0 && yoyMonths && yoyMonths.length > 0) {
+      // Same-period monthly comparison (e.g., 2026 Q1 vs 2025 Q1)
+      const monthsSet = new Set(yoyMonths);
+      for (const r of partnerProductsMonthly) {
+        if (!filterRow(r)) continue;
+        if (r.year === tgtYear && monthsSet.has(r.month)) {
+          const ex = curMap.get(r.material_id);
+          if (ex) ex.amount += r.amount;
+          else curMap.set(r.material_id, { material: r.material, amount: r.amount });
+        } else if (prvYear && r.year === prvYear && monthsSet.has(r.month)) {
+          const ex = prevMap.get(r.material_id);
+          if (ex) ex.amount += r.amount;
+          else prevMap.set(r.material_id, { material: r.material, amount: r.amount });
+        }
+      }
+    } else {
+      // Full-year comparison using yearly data (all-years source)
+      const source = partnerProductsMonthly ?? partnerProducts;
+      for (const r of source) {
+        if (!filterRow(r)) continue;
+        if (r.year === tgtYear) {
+          const ex = curMap.get(r.material_id);
+          if (ex) ex.amount += r.amount;
+          else curMap.set(r.material_id, { material: r.material, amount: r.amount });
+        } else if (prvYear && r.year === prvYear) {
+          const ex = prevMap.get(r.material_id);
+          if (ex) ex.amount += r.amount;
+          else prevMap.set(r.material_id, { material: r.material, amount: r.amount });
+        }
       }
     }
 
@@ -94,7 +120,7 @@ export default function PartnerBarChart({
       results.push({ material: cur.material, amount: cur.amount, yoy });
     }
     return results.sort((a, b) => b.amount - a.amount).slice(0, 20);
-  }, [partnerProducts, expandedPartner, selectedBrn, detailTeam, yoyTargetYear, yoyPrevYear]);
+  }, [partnerProducts, partnerProductsMonthly, expandedPartner, selectedBrn, detailTeam, yoyTargetYear, yoyPrevYear, yoyMonths]);
 
   const expandedTeams = useMemo(() => {
     if (!expandedPartner) return [];
@@ -200,7 +226,9 @@ export default function PartnerBarChart({
                 <span className="ml-2 text-xs text-gray-400 font-normal">· {MARKETPLACE_NAMES[selectedBrn] || selectedBrn}</span>
               )}
               {yoyTargetYear && yoyPrevYear && (
-                <span className="ml-2 text-xs text-gray-400 font-normal">· {yoyPrevYear} → {yoyTargetYear} YoY</span>
+                <span className="ml-2 text-xs text-gray-400 font-normal">
+                  · {yoyPrevYear}{yoyMonths ? ` 1~${Math.max(...yoyMonths)}월` : "년"} → {yoyTargetYear}{yoyMonths ? ` 1~${Math.max(...yoyMonths)}월` : "년"} YoY
+                </span>
               )}
             </h4>
             {expandedTeams.length > 1 && (

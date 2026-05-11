@@ -300,6 +300,7 @@ export default function CommodityCompareChart({
       )}
 
       {mode === "yearly" ? (
+        <div key={displayYears.join("-")}>
         <ResponsiveContainer width="100%" height={yearlyChartHeight}>
           <BarChart
             layout="vertical"
@@ -348,6 +349,7 @@ export default function CommodityCompareChart({
             })}
           </BarChart>
         </ResponsiveContainer>
+        </div>
       ) : mode === "monthly" ? (
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>

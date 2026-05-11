@@ -202,7 +202,14 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       }
       const partnersAll = Array.from(partnersAllBrnMap.values()).sort((a, b) => b.amount - a.amount);
 
-      return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn: [] as ProductBrnItem[], partners: [] as { partner_name: string; amount: number; qty: number; num_products: number }[], teams, brnTotals: [] as { brn: string; amount: number; qty: number }[], kpi, partnerBrn: pbFilt, partnerProducts: ppFilt, growthRate, mpTrendData: [] as Record<string, number | string>[], partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear, teamBrnMonthly: [] as { brn: string; year: number; month: number; amount: number }[], teamPartnerProducts: [] as { brn: string; material: string; material_id: string; year: number; amount: number }[] };
+      // Partner YoY: selectedYear-aware target/prev years + same-period month comparison
+      const partnerYoyTargetYear = selectedYear === "ALL" ? growthTargetYear : parseInt(selectedYear);
+      const partnerYoyPrevYear = selectedYear === "ALL" ? growthPrevYear : (parseInt(selectedYear) - 1);
+      const tgtMonthsBrn = (monthlyByYearAll[partnerYoyTargetYear] ?? []).map(m => m.month).sort((a, b) => a - b);
+      const partnerYoyMonths: number[] | null = (tgtMonthsBrn.length > 0 && tgtMonthsBrn.length < 12) ? tgtMonthsBrn : null;
+      const partnerProdMonthly = rawData.partnerProductsMonthly.filter(r => r.brn === selectedBrn);
+
+      return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn: [] as ProductBrnItem[], partners: [] as { partner_name: string; amount: number; qty: number; num_products: number }[], teams, brnTotals: [] as { brn: string; amount: number; qty: number }[], kpi, partnerBrn: pbFilt, partnerProducts: ppFilt, growthRate, mpTrendData: [] as Record<string, number | string>[], partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear, partnerYoyTargetYear, partnerYoyPrevYear, partnerYoyMonths, partnerProdMonthly, teamBrnMonthly: [] as { brn: string; year: number; month: number; amount: number }[], teamPartnerProducts: [] as { brn: string; material: string; material_id: string; year: number; amount: number }[] };
     }
 
     // ── Overview / Team view ───────────────────────────────────────────────
@@ -397,7 +404,14 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       brn: r.brn, material: r.material, material_id: r.material_id, year: r.year, amount: r.amount,
     }));
 
-    return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts, growthRate, mpTrendData, partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear, teamBrnMonthly, teamPartnerProducts };
+    // Partner YoY: selectedYear-aware target/prev years + same-period month comparison
+    const partnerYoyTargetYear = selectedYear === "ALL" ? growthTargetYear : parseInt(selectedYear);
+    const partnerYoyPrevYear = selectedYear === "ALL" ? growthPrevYear : (parseInt(selectedYear) - 1);
+    const tgtMonthsTeam = (monthlyByYearAll[partnerYoyTargetYear] ?? []).map(m => m.month).sort((a, b) => a - b);
+    const partnerYoyMonths: number[] | null = (tgtMonthsTeam.length > 0 && tgtMonthsTeam.length < 12) ? tgtMonthsTeam : null;
+    const partnerProdMonthly = byTeam(rawData.partnerProductsMonthly);
+
+    return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts, growthRate, mpTrendData, partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear, partnerYoyTargetYear, partnerYoyPrevYear, partnerYoyMonths, partnerProdMonthly, teamBrnMonthly, teamPartnerProducts };
   }, [rawData, selectedTeam, selectedYear, isMarketplace, selectedBrn]);
 
   const commodityMonthlyByTeam = useMemo(() => {
@@ -620,7 +634,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                     </div>
                     <MarketplaceTrendChart data={chartData.mpTrendData} />
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
-                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} yoyTargetYear={chartData.growthTargetYear} yoyPrevYear={chartData.growthPrevYear} />
+                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} yoyTargetYear={chartData.partnerYoyTargetYear} yoyPrevYear={chartData.partnerYoyPrevYear} yoyMonths={chartData.partnerYoyMonths} partnerProductsMonthly={chartData.partnerProdMonthly} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <InsightPanel
                       tabType="overview" tabName="Overview"
@@ -639,7 +653,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                   <>
                     <TeamDonutChart data={chartData.teams} />
                     <TopProductsChart data={chartData.products} productBrn={[]} />
-                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} yoyTargetYear={chartData.growthTargetYear} yoyPrevYear={chartData.growthPrevYear} />
+                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} yoyTargetYear={chartData.partnerYoyTargetYear} yoyPrevYear={chartData.partnerYoyPrevYear} yoyMonths={chartData.partnerYoyMonths} partnerProductsMonthly={chartData.partnerProdMonthly} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <InsightPanel
                       tabType="marketplace" tabName={mpName}
@@ -661,13 +675,14 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                       allYears={rawData.summary.years}
                     />
                     <CommodityCompareChart
+                      key={activeTab}
                       data={commodityMonthlyByTeam}
                       allYears={rawData.summary.years}
                       products={commodityProductsByTeam}
                       selectedYear={selectedYear}
                     />
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
-                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} yoyTargetYear={chartData.growthTargetYear} yoyPrevYear={chartData.growthPrevYear} />
+                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} yoyTargetYear={chartData.partnerYoyTargetYear} yoyPrevYear={chartData.partnerYoyPrevYear} yoyMonths={chartData.partnerYoyMonths} partnerProductsMonthly={chartData.partnerProdMonthly} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <BRNPieChart data={chartData.brnTotals} />
                     <InsightPanel
