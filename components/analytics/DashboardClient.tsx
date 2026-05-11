@@ -166,10 +166,11 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
         if (rates.length > 0) growthRate = (rates.reduce((s, r) => s + r, 0) / rates.length) * 100;
       }
 
-      // Product YoY growth for marketplace
+      // Product YoY growth for marketplace — use last two complete years to avoid partial-year distortion
       const brnYears = [...new Set(brnAllData.map((r) => r.year))].sort();
-      const growthTargetYear = brnYears.at(-1) ?? 0;
-      const growthPrevYear = brnYears.at(-2) ?? 0;
+      const completeYears = brnYears.filter(y => (monthlyByYearAll[y]?.length ?? 0) >= 12);
+      const growthTargetYear = completeYears.at(-1) ?? brnYears.at(-1) ?? 0;
+      const growthPrevYear = completeYears.at(-2) ?? brnYears.at(-2) ?? 0;
       const topGrowing: GrowthItem[] = [];
       const topDeclining: GrowthItem[] = [];
       if (growthPrevYear && growthTargetYear) {
@@ -355,10 +356,11 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     // All partners for Pareto (unsliced)
     const partnersAll = Array.from(partnerMap.values()).sort((a, b) => b.amount - a.amount);
 
-    // Product YoY growth
+    // Product YoY growth — use last two complete years to avoid partial-year distortion
     const sortedYearsArr = [...allYears].sort();
-    const growthTargetYear = sortedYearsArr.at(-1) ?? 0;
-    const growthPrevYear = sortedYearsArr.at(-2) ?? 0;
+    const completeYearsArr = sortedYearsArr.filter(y => (monthlyByYearAll[y]?.length ?? 0) >= 12);
+    const growthTargetYear = completeYearsArr.at(-1) ?? sortedYearsArr.at(-1) ?? 0;
+    const growthPrevYear = completeYearsArr.at(-2) ?? sortedYearsArr.at(-2) ?? 0;
     const topGrowing: GrowthItem[] = [];
     const topDeclining: GrowthItem[] = [];
     if (growthPrevYear && growthTargetYear) {
