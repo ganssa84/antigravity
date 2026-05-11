@@ -203,6 +203,13 @@ const MARKETPLACE_CONTEXT: Record<string, { name: string; traits: string[]; oppo
   },
 };
 
+// Korean particle: "이" after consonant-ending syllable, "가" after vowel-ending
+function josaIGA(word: string): string {
+  const code = word.charCodeAt(word.length - 1);
+  if (code >= 0xAC00 && code <= 0xD7A3) return (code - 0xAC00) % 28 === 0 ? "가" : "이";
+  return "이";
+}
+
 function generateInsights(inputs: InsightInputs) {
   const { tabType, tabName, kpi, yearly, topProducts, partnersAll, growthRate, topGrowing, topDeclining, brnTotals, teams, growthTargetYear, growthPrevYear } = inputs;
 
@@ -274,7 +281,7 @@ function generateInsights(inputs: InsightInputs) {
     insights.push(`${growthPrevYear}→${growthTargetYear} 급성장 제품: ${top3}`);
     const bigWinner = topGrowing[0];
     if (bigWinner.changePct > 80) {
-      insights.push(`"${bigWinner.material.slice(0, 20)}"이 ${pct(bigWinner.changePct)} 급성장 중 — 수요 급증 배경(신규 고객사 유입 또는 시장 확대 여부) 확인 후 재고·공급망 확대 선제 준비 필요`);
+      insights.push(`"${bigWinner.material.slice(0, 20)}"${josaIGA(bigWinner.material.slice(0, 20))} ${pct(bigWinner.changePct)} 급성장 중 — 수요 급증 배경(신규 고객사 유입 또는 시장 확대 여부) 확인 후 재고·공급망 확대 선제 준비 필요`);
     }
   }
   if (topDeclining.length > 0 && growthTargetYear && growthPrevYear) {
@@ -298,7 +305,7 @@ function generateInsights(inputs: InsightInputs) {
     const top1 = sorted[0];
     const top1Pct = total > 0 ? (top1.amount / total * 100).toFixed(0) : "0";
     const mpName = MARKETPLACE_NAMES[top1.brn] || top1.brn;
-    insights.push(`${mpName}이 전체 매출의 ${top1Pct}%로 최대 채널 — 타 채널 대비 수요 집중도가 높아 해당 플랫폼 정책 변화 시 민감도 모니터링 필요`);
+    insights.push(`${mpName}${josaIGA(mpName)} 전체 매출의 ${top1Pct}%로 최대 채널 — 타 채널 대비 수요 집중도가 높아 해당 플랫폼 정책 변화 시 민감도 모니터링 필요`);
     if (sorted.length >= 2) {
       const top2 = sorted[1];
       const top2Pct = total > 0 ? (top2.amount / total * 100).toFixed(0) : "0";

@@ -55,14 +55,7 @@ export default function MarketplaceTrendChart({ data }: { data: TrendRow[] }) {
         <BarChart data={data} margin={{ top: 4, right: 52, left: 0, bottom: 0 }} barCategoryGap="30%">
           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
           <XAxis dataKey="year" tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
-          <YAxis
-            tickFormatter={(v) => `${v}%`}
-            tick={{ fill: "#9ca3af", fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-            domain={[0, 100]}
-            width={44}
-          />
+          <YAxis hide domain={[0, 100]} />
           <Tooltip
             contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
             formatter={(v, name) => [`${v}%`, name]}
