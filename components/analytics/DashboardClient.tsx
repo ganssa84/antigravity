@@ -530,6 +530,28 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
             <div className="w-full max-w-lg">
               <UploadPanel onData={(data) => { setRawData(data); setShowUpload(false); }} />
             </div>
+
+            {/* Usage notices */}
+            <div className="w-full max-w-lg mt-4 space-y-2.5">
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+                <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+                <div>
+                  <p className="text-xs font-semibold text-amber-700 mb-0.5">탭을 닫으면 데이터가 사라집니다</p>
+                  <p className="text-xs text-amber-600 leading-relaxed">브라우저를 닫거나 새로고침하면 업로드한 데이터가 초기화됩니다. 대시보드를 다시 사용할 때마다 파일을 재업로드해야 합니다.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                <svg className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <div>
+                  <p className="text-xs font-semibold text-emerald-700 mb-0.5">파일은 서버에 저장되지 않습니다</p>
+                  <p className="text-xs text-emerald-600 leading-relaxed">업로드한 Excel 파일은 내 컴퓨터의 브라우저 안에서만 처리됩니다. 파일 내용이 외부 서버로 전송되거나 저장되지 않습니다.</p>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <>
