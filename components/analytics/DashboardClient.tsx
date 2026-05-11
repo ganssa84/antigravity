@@ -130,29 +130,25 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       }
       const teams = Array.from(teamMap.values()).sort((a, b) => b.amount - a.amount);
 
-      const brnLatest = yearly.at(-1);
-      const brnPrev = yearly.at(-2);
-      let brnPrevAmount: number | undefined;
-      let brnYoyRate: number | undefined;
-      if (brnLatest && brnPrev && selectedYear === "ALL") {
-        brnPrevAmount = brnLatest.compareAmount ?? brnPrev.amount;
-        brnYoyRate = brnPrevAmount > 0 ? (brnLatest.amount - brnPrevAmount) / brnPrevAmount * 100 : undefined;
-      }
-      const brnCompletedYears = yearly.filter(y => !y.compareLabel);
-      let brnCagr: number | undefined;
-      if (brnCompletedYears.length >= 2) {
-        const first = brnCompletedYears[0].amount;
-        const last = brnCompletedYears.at(-1)!.amount;
-        const n = brnCompletedYears.length - 1;
-        if (first > 0) brnCagr = (Math.pow(last / first, 1 / n) - 1) * 100;
-      }
+      // Q1 2026 vs Q1 2025 (marketplace-specific)
+      const brnQ1Current = Math.round(brnAllData.filter(r => r.year === 2026 && r.month <= 3).reduce((s, r) => s + r.amount, 0));
+      const brnQ1Prev = Math.round(brnAllData.filter(r => r.year === 2025 && r.month <= 3).reduce((s, r) => s + r.amount, 0));
+      const brnYoyRate: number | undefined = brnQ1Prev > 0 ? (brnQ1Current - brnQ1Prev) / brnQ1Prev * 100 : undefined;
+
+      // CAGR 2023~2025 (marketplace-specific)
+      const brnYr2023 = Math.round(brnAllData.filter(r => r.year === 2023).reduce((s, r) => s + r.amount, 0));
+      const brnYr2025 = Math.round(brnAllData.filter(r => r.year === 2025).reduce((s, r) => s + r.amount, 0));
+      const brnCagr: number | undefined = brnYr2023 > 0 && brnYr2025 > 0
+        ? (Math.pow(brnYr2025 / brnYr2023, 1 / 2) - 1) * 100
+        : undefined;
 
       const kpi = {
         total_amount: Math.round(brnFilt.reduce((s, r) => s + r.amount, 0)),
         total_qty: Math.round(brnFilt.reduce((s, r) => s + r.qty, 0) * 100) / 100,
         num_partners: new Set(pbFilt.map(r => r.partner_name)).size,
         num_products: new Set(ppFilt.map(r => r.material_id)).size,
-        prev_amount: brnPrevAmount,
+        q1_current: brnQ1Current || undefined,
+        q1_prev: brnQ1Prev || undefined,
         yoy_rate: brnYoyRate,
         cagr: brnCagr,
       };
@@ -553,10 +549,8 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
               <div className="px-8 pb-10 pt-4 space-y-5">
                 <KPICards
                   kpi={chartData.kpi}
-                  visibleKeys={isOverview
-                    ? ["q1_current", "q1_prev", "yoy_rate", "cagr"]
-                    : ["total_amount", "total_qty", "num_partners", "num_products"]}
-                  growthRate={isOverview ? null : chartData.growthRate}
+                  visibleKeys={["q1_current", "q1_prev", "yoy_rate", "cagr"]}
+                  growthRate={null}
                 />
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
