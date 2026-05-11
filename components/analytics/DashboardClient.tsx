@@ -620,7 +620,6 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                     </div>
                     <MarketplaceTrendChart data={chartData.mpTrendData} />
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
-                    <ProductGrowthChart topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining} currentYear={chartData.growthTargetYear} prevYear={chartData.growthPrevYear} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <InsightPanel
@@ -640,7 +639,6 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                   <>
                     <TeamDonutChart data={chartData.teams} />
                     <TopProductsChart data={chartData.products} productBrn={[]} />
-                    <ProductGrowthChart topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining} currentYear={chartData.growthTargetYear} prevYear={chartData.growthPrevYear} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <InsightPanel
@@ -669,7 +667,6 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                       selectedYear={selectedYear}
                     />
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
-                    <ProductGrowthChart topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining} currentYear={chartData.growthTargetYear} prevYear={chartData.growthPrevYear} />
                     <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <BRNPieChart data={chartData.brnTotals} />
