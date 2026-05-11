@@ -520,7 +520,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       </aside>
 
       {/* Main — true scroll container so sticky top-0 on header works */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-scroll analytics-scroll">
         {!rawData ? (
           <div className="flex flex-col items-center justify-center min-h-full py-16 px-8">
             <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center mb-4">
@@ -620,7 +620,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                     </div>
                     <MarketplaceTrendChart data={chartData.mpTrendData} />
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
-                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
+                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} yoyTargetYear={chartData.growthTargetYear} yoyPrevYear={chartData.growthPrevYear} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <InsightPanel
                       tabType="overview" tabName="Overview"
@@ -639,7 +639,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                   <>
                     <TeamDonutChart data={chartData.teams} />
                     <TopProductsChart data={chartData.products} productBrn={[]} />
-                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
+                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} yoyTargetYear={chartData.growthTargetYear} yoyPrevYear={chartData.growthPrevYear} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <InsightPanel
                       tabType="marketplace" tabName={mpName}
@@ -667,7 +667,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                       selectedYear={selectedYear}
                     />
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
-                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} />
+                    <PartnerBarChart partnerBrn={chartData.partnerBrn} partnerProducts={chartData.partnerProducts} yoyTargetYear={chartData.growthTargetYear} yoyPrevYear={chartData.growthPrevYear} />
                     <PartnerParetoChart data={chartData.partnersAll} />
                     <BRNPieChart data={chartData.brnTotals} />
                     <InsightPanel

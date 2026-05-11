@@ -56,7 +56,7 @@ export default function CommodityCompareChart({
   // When top-level selectedYear prop is set, it overrides the internal year picker
   const effectiveViewYear = selectedYear !== "ALL" ? parseInt(selectedYear) : viewYear;
   // In yearly mode, show only the selected year's bars (or all years if ALL)
-  const displayYears = selectedYear !== "ALL" ? [parseInt(selectedYear)] : allYears;
+  const displayYears = selectedYear !== "ALL" ? [parseInt(selectedYear)] : [...allYears].sort((a, b) => a - b);
 
   // Detect partial year dynamically from data
   const { latestPartialMonths, dataLatestYear } = useMemo(() => {
@@ -173,7 +173,10 @@ export default function CommodityCompareChart({
   const productList = useMemo(() => {
     if (selectedCommodity === null || products.length === 0) return [];
 
-    const targetYear = selectedYear !== "ALL" ? parseInt(selectedYear) : (allYears[allYears.length - 1] ?? 0);
+    const rawTargetYear = selectedYear !== "ALL" ? parseInt(selectedYear) : (allYears[allYears.length - 1] ?? 0);
+    // When the target year is partial (e.g. 2026 Q1), fall back to last complete year for fair YoY
+    const isTargetPartialYear = latestPartialMonths !== null && rawTargetYear === dataLatestYear;
+    const targetYear = isTargetPartialYear ? (allYears[allYears.indexOf(dataLatestYear) - 1] ?? rawTargetYear) : rawTargetYear;
     const targetYearIdx = allYears.indexOf(targetYear);
     const prevYear = targetYearIdx > 0 ? allYears[targetYearIdx - 1] : null;
 
@@ -219,13 +222,15 @@ export default function CommodityCompareChart({
 
   const selectedLabel = selectedCommodity !== null ? commLabel(selectedCommodity) : null;
 
-  // Determine which year the product list is showing
-  const productTargetYear = selectedYear !== "ALL" ? parseInt(selectedYear) : (allYears[allYears.length - 1] ?? 0);
+  // Determine which year the product list is showing (skip partial years for fair YoY)
+  const rawProductTargetYear = selectedYear !== "ALL" ? parseInt(selectedYear) : (allYears[allYears.length - 1] ?? 0);
+  const productTargetYear = (latestPartialMonths !== null && rawProductTargetYear === dataLatestYear)
+    ? (allYears[allYears.indexOf(dataLatestYear) - 1] ?? rawProductTargetYear)
+    : rawProductTargetYear;
   const productPrevYear = (() => {
     const idx = allYears.indexOf(productTargetYear);
     return idx > 0 ? allYears[idx - 1] : null;
   })();
-  const isProductYearPartial = latestPartialMonths !== null && productTargetYear === dataLatestYear;
 
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
@@ -392,8 +397,7 @@ export default function CommodityCompareChart({
             <p className="text-xs font-semibold text-indigo-700">
               {selectedLabel} 제품 Top 20
               <span className="ml-1.5 text-gray-400 font-normal">
-                {productTargetYear}년{isProductYearPartial && ` 1~${Math.max(...latestPartialMonths!)}월`}
-                {productPrevYear && ` · vs ${productPrevYear}년 YoY`}
+                {productTargetYear}년{productPrevYear && ` · vs ${productPrevYear}년 YoY`}
               </span>
             </p>
             <button

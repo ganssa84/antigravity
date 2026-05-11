@@ -32,9 +32,13 @@ function formatAmountShort(v: number) {
 export default function PartnerBarChart({
   partnerBrn,
   partnerProducts,
+  yoyTargetYear,
+  yoyPrevYear,
 }: {
   partnerBrn: PartnerBrnRow[];
   partnerProducts: PartnerProductRow[];
+  yoyTargetYear?: number;
+  yoyPrevYear?: number;
 }) {
   const [selectedBrn, setSelectedBrn] = useState<string>("ALL");
   const [expandedPartner, setExpandedPartner] = useState<string | null>(null);
@@ -55,21 +59,42 @@ export default function PartnerBarChart({
   }, [partnerBrn, selectedBrn]);
 
   const expandedProducts = useMemo(() => {
-    if (!expandedPartner) return [];
+    if (!expandedPartner) return [] as { material: string; amount: number; yoy: number | null }[];
     const filtered = partnerProducts.filter(r => {
       if (r.partner_name !== expandedPartner) return false;
       if (selectedBrn !== "ALL" && r.brn !== selectedBrn) return false;
       if (detailTeam !== "ALL" && r.home_team !== detailTeam) return false;
       return true;
     });
-    const map = new Map<string, { material: string; amount: number }>();
+
+    const dataYears = [...new Set(filtered.map(r => r.year))].sort((a, b) => a - b);
+    const tgtYear = yoyTargetYear ?? dataYears.at(-1) ?? 0;
+    const prvYear = yoyPrevYear ?? dataYears.at(-2) ?? 0;
+
+    if (!tgtYear) return [];
+
+    const curMap = new Map<string, { material: string; amount: number }>();
+    const prevMap = new Map<string, { material: string; amount: number }>();
     for (const r of filtered) {
-      const ex = map.get(r.material_id);
-      if (ex) ex.amount += r.amount;
-      else map.set(r.material_id, { material: r.material, amount: r.amount });
+      if (r.year === tgtYear) {
+        const ex = curMap.get(r.material_id);
+        if (ex) ex.amount += r.amount;
+        else curMap.set(r.material_id, { material: r.material, amount: r.amount });
+      } else if (prvYear && r.year === prvYear) {
+        const ex = prevMap.get(r.material_id);
+        if (ex) ex.amount += r.amount;
+        else prevMap.set(r.material_id, { material: r.material, amount: r.amount });
+      }
     }
-    return Array.from(map.values()).sort((a, b) => b.amount - a.amount).slice(0, 20);
-  }, [partnerProducts, expandedPartner, selectedBrn, detailTeam]);
+
+    const results: { material: string; amount: number; yoy: number | null }[] = [];
+    for (const [mid, cur] of curMap) {
+      const prev = prevMap.get(mid);
+      const yoy = prev && prev.amount > 0 ? (cur.amount - prev.amount) / prev.amount * 100 : null;
+      results.push({ material: cur.material, amount: cur.amount, yoy });
+    }
+    return results.sort((a, b) => b.amount - a.amount).slice(0, 20);
+  }, [partnerProducts, expandedPartner, selectedBrn, detailTeam, yoyTargetYear, yoyPrevYear]);
 
   const expandedTeams = useMemo(() => {
     if (!expandedPartner) return [];
@@ -174,6 +199,9 @@ export default function PartnerBarChart({
               {selectedBrn !== "ALL" && (
                 <span className="ml-2 text-xs text-gray-400 font-normal">· {MARKETPLACE_NAMES[selectedBrn] || selectedBrn}</span>
               )}
+              {yoyTargetYear && yoyPrevYear && (
+                <span className="ml-2 text-xs text-gray-400 font-normal">· {yoyPrevYear} → {yoyTargetYear} YoY</span>
+              )}
             </h4>
             {expandedTeams.length > 1 && (
               <div className="flex gap-1">
@@ -211,8 +239,15 @@ export default function PartnerBarChart({
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-700 truncate">{p.material}</p>
                   </div>
+                  {p.yoy !== null ? (
+                    <span className={`text-xs font-semibold shrink-0 w-14 text-right ${p.yoy >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                      {p.yoy >= 0 ? "▲" : "▼"}{Math.abs(p.yoy).toFixed(0)}%
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-300 shrink-0 w-14 text-right">신규</span>
+                  )}
                   <span className="text-xs font-semibold text-gray-900 shrink-0">{formatAmount(p.amount)}</span>
-                  <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
+                  <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
                     <div
                       className="h-full bg-indigo-400 rounded-full"
                       style={{ width: `${(p.amount / expandedProducts[0].amount) * 100}%` }}
