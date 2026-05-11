@@ -294,29 +294,26 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     const totalAmount = monthlyFiltered.reduce((s, r) => s + r.amount, 0);
     const totalQty = monthlyFiltered.reduce((s, r) => s + r.qty, 0);
 
-    const latestEntry = yearly.at(-1);
-    const prevEntry = yearly.at(-2);
-    let prevAmount: number | undefined;
-    let yoyRate: number | undefined;
-    if (latestEntry && prevEntry && selectedYear === "ALL") {
-      prevAmount = latestEntry.compareAmount ?? prevEntry.amount;
-      yoyRate = prevAmount > 0 ? (latestEntry.amount - prevAmount) / prevAmount * 100 : undefined;
-    }
-    const completedYears = yearly.filter(y => !y.compareLabel);
-    let cagrVal: number | undefined;
-    if (completedYears.length >= 2) {
-      const first = completedYears[0].amount;
-      const last = completedYears.at(-1)!.amount;
-      const n = completedYears.length - 1;
-      if (first > 0) cagrVal = (Math.pow(last / first, 1 / n) - 1) * 100;
-    }
+    // Q1 2026 vs Q1 2025
+    const allTeamMonthly = byTeam(rawData.monthly);
+    const q1Current = Math.round(allTeamMonthly.filter(r => r.year === 2026 && r.month <= 3).reduce((s, r) => s + r.amount, 0));
+    const q1Prev = Math.round(allTeamMonthly.filter(r => r.year === 2025 && r.month <= 3).reduce((s, r) => s + r.amount, 0));
+    const yoyRate: number | undefined = q1Prev > 0 ? (q1Current - q1Prev) / q1Prev * 100 : undefined;
+
+    // CAGR 2023~2025 (full years only)
+    const yr2023 = Math.round(allTeamMonthly.filter(r => r.year === 2023).reduce((s, r) => s + r.amount, 0));
+    const yr2025 = Math.round(allTeamMonthly.filter(r => r.year === 2025).reduce((s, r) => s + r.amount, 0));
+    const cagrVal: number | undefined = yr2023 > 0 && yr2025 > 0
+      ? (Math.pow(yr2025 / yr2023, 1 / 2) - 1) * 100
+      : undefined;
 
     const kpi = {
       total_amount: Math.round(totalAmount),
       total_qty: Math.round(totalQty * 100) / 100,
       num_partners: partnerMap.size || rawData.summary.overall.num_partners,
       num_products: productMap.size || rawData.summary.overall.num_products,
-      prev_amount: prevAmount,
+      q1_current: q1Current || undefined,
+      q1_prev: q1Prev || undefined,
       yoy_rate: yoyRate,
       cagr: cagrVal,
     };
@@ -557,7 +554,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                 <KPICards
                   kpi={chartData.kpi}
                   visibleKeys={isOverview
-                    ? ["total_amount", "prev_amount", "yoy_rate", "cagr"]
+                    ? ["q1_current", "q1_prev", "yoy_rate", "cagr"]
                     : ["total_amount", "total_qty", "num_partners", "num_products"]}
                   growthRate={isOverview ? null : chartData.growthRate}
                 />
