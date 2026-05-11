@@ -15,7 +15,7 @@ const MP_COLORS: Record<string, string> = {
   "8158101244": "#e11d48",
 };
 
-type BrnYearlyRow = { brn: string; year: number; amount: number };
+type BrnMonthlyRow = { brn: string; year: number; month: number; amount: number };
 type ProductRow = { brn: string; material: string; material_id: string; year: number; amount: number };
 
 function formatAmount(v: number) {
@@ -28,48 +28,78 @@ function formatAmount(v: number) {
 type GrowthItem = { material: string; material_id: string; currentAmount: number; prevAmount: number; changePct: number };
 
 export default function TeamMarketplaceChart({
-  brnYearly,
+  brnMonthly,
   partnerProducts,
   allYears,
 }: {
-  brnYearly: BrnYearlyRow[];
+  brnMonthly: BrnMonthlyRow[];
   partnerProducts: ProductRow[];
   allYears: number[];
 }) {
   const [selectedBrn, setSelectedBrn] = useState<string | null>(null);
 
-  const { chartData, brnStats, activeBrns } = useMemo(() => {
-    const byBrnYear = new Map<string, number>();
-    for (const r of brnYearly) {
+  const { chartData, brnStats, activeBrns, maxMonth } = useMemo(() => {
+    const byBrnMonth = new Map<string, number>();
+    for (const r of brnMonthly) {
       if (!MARKETPLACE_BRNS.includes(r.brn as typeof MARKETPLACE_BRNS[number])) continue;
-      const k = `${r.brn}|${r.year}`;
-      byBrnYear.set(k, (byBrnYear.get(k) ?? 0) + r.amount);
+      const k = `${r.brn}|${r.year}|${r.month}`;
+      byBrnMonth.set(k, (byBrnMonth.get(k) ?? 0) + r.amount);
     }
 
+    // Detect partial latest year
+    const latestYear = allYears[allYears.length - 1] ?? 0;
+    const prevYear = allYears[allYears.length - 2] ?? 0;
+    const latestMonthsSet = new Set(brnMonthly.filter(r => r.year === latestYear).map(r => r.month));
+    const maxMonth = latestMonthsSet.size > 0 ? Math.max(...latestMonthsSet) : 12;
+    const isPartial = maxMonth < 12;
+
     const activeBrns = MARKETPLACE_BRNS.filter(brn =>
-      allYears.some(y => (byBrnYear.get(`${brn}|${y}`) ?? 0) > 0)
+      allYears.some(y => {
+        const maxM = y === latestYear ? maxMonth : 12;
+        for (let m = 1; m <= maxM; m++) {
+          if ((byBrnMonth.get(`${brn}|${y}|${m}`) ?? 0) > 0) return true;
+        }
+        return false;
+      })
     );
 
-    const chartData = allYears.map(y => {
-      const row: Record<string, number | string> = { year: String(y) };
+    // Build month-by-month time series
+    const allMonthKeys: string[] = [];
+    for (const y of allYears) {
+      const maxM = y === latestYear ? maxMonth : 12;
+      for (let m = 1; m <= maxM; m++) {
+        allMonthKeys.push(`${y}-${String(m).padStart(2, "0")}`);
+      }
+    }
+
+    const chartData = allMonthKeys.map(key => {
+      const [yearStr, monthStr] = key.split("-");
+      const y = parseInt(yearStr);
+      const m = parseInt(monthStr);
+      const row: Record<string, number | string> = { month: key };
       for (const brn of activeBrns) {
-        row[MARKETPLACE_NAMES[brn] || brn] = byBrnYear.get(`${brn}|${y}`) ?? 0;
+        row[MARKETPLACE_NAMES[brn] || brn] = byBrnMonth.get(`${brn}|${y}|${m}`) ?? 0;
       }
       return row;
     });
 
-    const latestYear = allYears.at(-1)!;
-    const prevYear = allYears.at(-2);
+    // YoY chips: for partial latest year, compare same months vs prior year
+    const compareMonths = isPartial
+      ? Array.from({ length: maxMonth }, (_, i) => i + 1)
+      : Array.from({ length: 12 }, (_, i) => i + 1);
+
     const brnStats = activeBrns.map(brn => {
       const name = MARKETPLACE_NAMES[brn] || brn;
-      const current = byBrnYear.get(`${brn}|${latestYear}`) ?? 0;
-      const prev = prevYear ? (byBrnYear.get(`${brn}|${prevYear}`) ?? 0) : 0;
+      const current = compareMonths.reduce((s, m) => s + (byBrnMonth.get(`${brn}|${latestYear}|${m}`) ?? 0), 0);
+      const prev = prevYear
+        ? compareMonths.reduce((s, m) => s + (byBrnMonth.get(`${brn}|${prevYear}|${m}`) ?? 0), 0)
+        : 0;
       const yoy = prev > 0 ? (current - prev) / prev * 100 : null;
-      return { brn, name, current, prev, yoy };
+      return { brn, name, current, prev, yoy, isPartial };
     }).filter(s => s.current > 0 || s.prev > 0);
 
-    return { chartData, brnStats, activeBrns };
-  }, [brnYearly, allYears]);
+    return { chartData, brnStats, activeBrns, maxMonth };
+  }, [brnMonthly, allYears]);
 
   const { topGrowing, topDeclining, targetYear, prevYear } = useMemo(() => {
     if (!selectedBrn) return { topGrowing: [] as GrowthItem[], topDeclining: [] as GrowthItem[], targetYear: 0, prevYear: 0 };
@@ -94,7 +124,11 @@ export default function TeamMarketplaceChart({
     for (const [mid, cur] of curMap) {
       const prev = prevMap.get(mid);
       if (!prev || prev.amount === 0 || cur.amount < 3_000_000) continue;
-      items.push({ material: cur.material, material_id: mid, currentAmount: cur.amount, prevAmount: prev.amount, changePct: (cur.amount - prev.amount) / prev.amount * 100 });
+      items.push({
+        material: cur.material, material_id: mid,
+        currentAmount: cur.amount, prevAmount: prev.amount,
+        changePct: (cur.amount - prev.amount) / prev.amount * 100,
+      });
     }
 
     return {
@@ -109,14 +143,26 @@ export default function TeamMarketplaceChart({
 
   const selectedName = selectedBrn ? (MARKETPLACE_NAMES[selectedBrn] || selectedBrn) : null;
 
+  // X-axis: show only Jan (year label) and quarterly marks (4, 7, 10)
+  const quarterlyTicks = chartData
+    .filter(d => { const m = parseInt(String(d.month).split("-")[1]); return m === 1 || m === 4 || m === 7 || m === 10; })
+    .map(d => String(d.month));
+
+  const tickFormatter = (key: string) => {
+    const parts = key.split("-");
+    const m = parseInt(parts[1]);
+    if (m === 1) return `${parts[0]}년`;
+    return `${m}월`;
+  };
+
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
       <h3 className="text-sm font-semibold text-gray-700 mb-1">마켓플레이스별 매출 추이</h3>
-      <p className="text-xs text-gray-400 mb-4">채널별 연도별 매출 · 채널 클릭 시 제품 증감 분석</p>
+      <p className="text-xs text-gray-400 mb-4">채널별 월별 매출 · 채널 클릭 시 제품 증감 분석</p>
 
       {/* YoY 채널 칩 */}
       <div className="flex flex-wrap gap-2 mb-5">
-        {brnStats.map(({ brn, name, current, yoy }) => {
+        {brnStats.map(({ brn, name, current, yoy, isPartial }) => {
           const isSelected = selectedBrn === brn;
           return (
             <button
@@ -130,7 +176,9 @@ export default function TeamMarketplaceChart({
             >
               <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: MP_COLORS[brn] }} />
               {name}
-              <span className={isSelected ? "text-indigo-200" : "text-gray-500"}>{formatAmount(current)}원</span>
+              <span className={isSelected ? "text-indigo-200" : "text-gray-500"}>
+                {formatAmount(current)}원{isPartial && ` (1~${maxMonth}월)`}
+              </span>
               {yoy !== null && (
                 <span className={isSelected ? "text-white font-bold" : yoy >= 0 ? "text-emerald-600 font-semibold" : "text-red-500 font-semibold"}>
                   {yoy >= 0 ? "▲" : "▼"}{Math.abs(yoy).toFixed(1)}%
@@ -141,14 +189,25 @@ export default function TeamMarketplaceChart({
         })}
       </div>
 
-      {/* 연도별 추이 라인 차트 */}
-      <ResponsiveContainer width="100%" height={240}>
+      {/* 월별 추이 라인 차트 */}
+      <ResponsiveContainer width="100%" height={260}>
         <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-          <XAxis dataKey="year" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
+          <XAxis
+            dataKey="month"
+            ticks={quarterlyTicks}
+            tick={{ fill: "#9ca3af", fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={tickFormatter}
+          />
           <YAxis tick={{ fill: "#9ca3af", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={formatAmount} width={48} />
           <Tooltip
             contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", fontSize: 12 }}
+            labelFormatter={(label) => {
+              const parts = String(label).split("-");
+              return `${parts[0]}년 ${parseInt(parts[1])}월`;
+            }}
             formatter={(v, name) => [`${formatAmount(v as number)}원`, name]}
           />
           <Legend wrapperStyle={{ fontSize: 12, color: "#6b7280" }} />
@@ -160,8 +219,8 @@ export default function TeamMarketplaceChart({
               stroke={MP_COLORS[brn]}
               strokeWidth={selectedBrn && selectedBrn !== brn ? 1 : 2.5}
               strokeOpacity={selectedBrn && selectedBrn !== brn ? 0.3 : 1}
-              dot={{ r: 4, fill: MP_COLORS[brn] }}
-              activeDot={{ r: 6 }}
+              dot={false}
+              activeDot={{ r: 5 }}
             />
           ))}
         </LineChart>
