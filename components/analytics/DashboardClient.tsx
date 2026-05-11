@@ -202,9 +202,9 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       }
       const partnersAll = Array.from(partnersAllBrnMap.values()).sort((a, b) => b.amount - a.amount);
 
-      // Partner YoY: selectedYear-aware target/prev years + same-period month comparison
-      const partnerYoyTargetYear = selectedYear === "ALL" ? growthTargetYear : parseInt(selectedYear);
-      const partnerYoyPrevYear = selectedYear === "ALL" ? growthPrevYear : (parseInt(selectedYear) - 1);
+      // Partner YoY: always use latest year (even if partial) vs same period prior year
+      const partnerYoyTargetYear = selectedYear === "ALL" ? (brnYears.at(-1) ?? growthTargetYear) : parseInt(selectedYear);
+      const partnerYoyPrevYear = selectedYear === "ALL" ? (brnYears.at(-2) ?? growthPrevYear) : (parseInt(selectedYear) - 1);
       const tgtMonthsBrn = (monthlyByYearAll[partnerYoyTargetYear] ?? []).map(m => m.month).sort((a, b) => a - b);
       const partnerYoyMonths: number[] | null = (tgtMonthsBrn.length > 0 && tgtMonthsBrn.length < 12) ? tgtMonthsBrn : null;
       const partnerProdMonthly = rawData.partnerProductsMonthly.filter(r => r.brn === selectedBrn);
@@ -404,9 +404,9 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       brn: r.brn, material: r.material, material_id: r.material_id, year: r.year, amount: r.amount,
     }));
 
-    // Partner YoY: selectedYear-aware target/prev years + same-period month comparison
-    const partnerYoyTargetYear = selectedYear === "ALL" ? growthTargetYear : parseInt(selectedYear);
-    const partnerYoyPrevYear = selectedYear === "ALL" ? growthPrevYear : (parseInt(selectedYear) - 1);
+    // Partner YoY: always use latest year (even if partial) vs same period prior year
+    const partnerYoyTargetYear = selectedYear === "ALL" ? (allYears.at(-1) ?? growthTargetYear) : parseInt(selectedYear);
+    const partnerYoyPrevYear = selectedYear === "ALL" ? (allYears.at(-2) ?? growthPrevYear) : (parseInt(selectedYear) - 1);
     const tgtMonthsTeam = (monthlyByYearAll[partnerYoyTargetYear] ?? []).map(m => m.month).sort((a, b) => a - b);
     const partnerYoyMonths: number[] | null = (tgtMonthsTeam.length > 0 && tgtMonthsTeam.length < 12) ? tgtMonthsTeam : null;
     const partnerProdMonthly = byTeam(rawData.partnerProductsMonthly);
