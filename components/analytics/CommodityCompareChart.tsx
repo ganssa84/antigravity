@@ -10,6 +10,10 @@ type CommodityMonthlyRow = {
   commodity: number; home_team: string; year: number; month: number; amount: number; qty: number;
 };
 
+type ProductRow = {
+  material: string; material_id: string; commodity: number; amount: number;
+};
+
 type Mode = "yearly" | "monthly" | "quarterly";
 
 const YEAR_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#f87171"];
@@ -25,24 +29,30 @@ const QUARTERS = [
 function formatAmount(v: number) {
   if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(1)}조`;
   if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`;
-  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}만`;
+  if (v >= 10_000) return `${Math.round(v / 10_000).toLocaleString()}만`;
   return v.toLocaleString();
+}
+
+function commLabel(c: number): string {
+  return c === 0 ? "미분류" : `C${c}`;
 }
 
 export default function CommodityCompareChart({
   data,
   allYears,
+  products = [],
 }: {
   data: CommodityMonthlyRow[];
   allYears: number[];
+  products?: ProductRow[];
 }) {
   const [mode, setMode] = useState<Mode>("yearly");
   const maxYear = allYears[allYears.length - 1] ?? new Date().getFullYear();
   const [viewYear, setViewYear] = useState<number>(maxYear);
+  const [selectedCommodity, setSelectedCommodity] = useState<number | null>(null);
 
-  const { chartData, topCommodities, yearlyTotals } = useMemo(() => {
+  const { chartData, topCommodities, yearlyTotals, nameToComm } = useMemo(() => {
     if (mode === "yearly") {
-      // Aggregate by commodity × year, find top 10
       const totals = new Map<number, number>();
       const byKey = new Map<string, number>();
       const yearTotals = new Map<number, number>();
@@ -58,7 +68,7 @@ export default function CommodityCompareChart({
         .map(([c]) => c);
 
       const rows = top.map(c => {
-        const row: Record<string, unknown> = { name: `C${c}` };
+        const row: Record<string, unknown> = { name: commLabel(c) };
         for (const y of allYears) {
           row[`${y}년`] = Math.round(byKey.get(`${c}|${y}`) ?? 0);
         }
@@ -71,10 +81,11 @@ export default function CommodityCompareChart({
         const yoy = i === 0 || prevAmt === 0 ? null : ((amt - prevAmt) / prevAmt) * 100;
         return { year: y, amount: amt, yoy };
       });
-      return { chartData: rows, topCommodities: top, yearlyTotals };
+
+      const nameToComm = new Map(top.map(c => [commLabel(c), c]));
+      return { chartData: rows, topCommodities: top, yearlyTotals, nameToComm };
     }
 
-    // monthly / quarterly: filter by viewYear, top 8 commodities
     const filtered = data.filter(r => r.year === viewYear);
     const yearlyTotals: { year: number; amount: number; yoy: number | null }[] = [];
     const totals = new Map<number, number>();
@@ -84,35 +95,57 @@ export default function CommodityCompareChart({
       .slice(0, 8)
       .map(([c]) => c);
 
+    const nameToComm = new Map(top.map(c => [commLabel(c), c]));
+
     if (mode === "monthly") {
       const rows = Array.from({ length: 12 }, (_, i) => {
         const month = i + 1;
         const row: Record<string, unknown> = { name: `${month}월` };
         for (const c of top) {
           const amt = filtered.filter(r => r.commodity === c && r.month === month).reduce((s, r) => s + r.amount, 0);
-          row[`C${c}`] = Math.round(amt);
+          row[commLabel(c)] = Math.round(amt);
         }
         return row;
       });
-      return { chartData: rows, topCommodities: top, yearlyTotals };
+      return { chartData: rows, topCommodities: top, yearlyTotals, nameToComm };
     }
 
-    // quarterly
     const rows = QUARTERS.map(q => {
       const row: Record<string, unknown> = { name: q.name };
       for (const c of top) {
         const amt = filtered.filter(r => r.commodity === c && q.months.includes(r.month)).reduce((s, r) => s + r.amount, 0);
-        row[`C${c}`] = Math.round(amt);
+        row[commLabel(c)] = Math.round(amt);
       }
       return row;
     });
-    return { chartData: rows, topCommodities: top, yearlyTotals };
+    return { chartData: rows, topCommodities: top, yearlyTotals, nameToComm };
   }, [data, allYears, mode, viewYear]);
+
+  const productList = useMemo(() => {
+    if (selectedCommodity === null || products.length === 0) return [];
+    const map = new Map<string, { material: string; amount: number }>();
+    for (const p of products.filter(p => p.commodity === selectedCommodity)) {
+      const ex = map.get(p.material_id);
+      if (ex) ex.amount += p.amount;
+      else map.set(p.material_id, { material: p.material, amount: p.amount });
+    }
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+  }, [selectedCommodity, products]);
 
   if (data.length === 0) return null;
 
   const barSize = mode === "yearly" ? 10 : undefined;
   const yearlyChartHeight = Math.max(280, topCommodities.length * (allYears.length * 12 + 14) + 60);
+
+  const handleYearlyClick = (d: Record<string, unknown>) => {
+    const payload = (d?.activePayload as { payload: { name: string } }[] | undefined)?.[0]?.payload;
+    if (!payload) return;
+    const comm = nameToComm.get(payload.name);
+    if (comm === undefined) return;
+    setSelectedCommodity(prev => prev === comm ? null : comm);
+  };
+
+  const selectedLabel = selectedCommodity !== null ? commLabel(selectedCommodity) : null;
 
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
@@ -153,6 +186,7 @@ export default function CommodityCompareChart({
         {mode === "yearly"
           ? `${allYears[0] ?? ""}년 ~ ${allYears[allYears.length - 1] ?? ""}년 · Top 10 Commodity`
           : `${viewYear}년 · Top 8 Commodity`}
+        {mode === "yearly" && <span className="ml-2 text-indigo-400">· 바 클릭 시 제품 목록 보기</span>}
       </p>
 
       {mode === "yearly" && yearlyTotals.length > 0 && (
@@ -179,10 +213,28 @@ export default function CommodityCompareChart({
             margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
             barGap={2}
             barCategoryGap="25%"
+            onClick={handleYearlyClick}
+            style={{ cursor: "pointer" }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
             <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={formatAmount} />
-            <YAxis type="category" dataKey="name" width={52} tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={56}
+              tick={(props) => {
+                const { x, y, payload } = props;
+                const isSelected = payload.value === selectedLabel;
+                return (
+                  <text x={x} y={y} textAnchor="end" dominantBaseline="central" fontSize={11}
+                    fill={isSelected ? "#6366f1" : "#6b7280"} fontWeight={isSelected ? 700 : 400}>
+                    {payload.value}
+                  </text>
+                );
+              }}
+              axisLine={false}
+              tickLine={false}
+            />
             <Tooltip
               contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
               formatter={(v) => [`${(v as number).toLocaleString()} 원`, ""]}
@@ -208,7 +260,7 @@ export default function CommodityCompareChart({
               <Line
                 key={c}
                 type="monotone"
-                dataKey={`C${c}`}
+                dataKey={commLabel(c)}
                 stroke={LINE_COLORS[i % LINE_COLORS.length]}
                 strokeWidth={2}
                 dot={{ r: 3 }}
@@ -229,10 +281,41 @@ export default function CommodityCompareChart({
             />
             <Legend wrapperStyle={{ fontSize: 12, color: "#6b7280" }} />
             {topCommodities.map((c, i) => (
-              <Bar key={c} dataKey={`C${c}`} fill={LINE_COLORS[i % LINE_COLORS.length]} radius={[3, 3, 0, 0]} />
+              <Bar key={c} dataKey={commLabel(c)} fill={LINE_COLORS[i % LINE_COLORS.length]} radius={[3, 3, 0, 0]} />
             ))}
           </BarChart>
         </ResponsiveContainer>
+      )}
+
+      {/* 제품 드릴다운 */}
+      {selectedCommodity !== null && (
+        <div className="mt-6 border-t border-gray-100 pt-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-indigo-700">
+              {selectedLabel} 제품 목록
+              <span className="ml-1.5 text-gray-400 font-normal">({productList.length}종)</span>
+            </p>
+            <button
+              onClick={() => setSelectedCommodity(null)}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              닫기 ✕
+            </button>
+          </div>
+          {productList.length === 0 ? (
+            <p className="text-xs text-gray-400">제품 데이터가 없습니다.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {productList.map((p, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-300 w-5 shrink-0 text-right">{i + 1}</span>
+                  <span className="text-xs text-gray-700 flex-1 truncate">{p.material}</span>
+                  <span className="text-xs font-semibold text-gray-900 shrink-0">{formatAmount(p.amount)}원</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

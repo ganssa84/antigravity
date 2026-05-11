@@ -386,6 +386,13 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       : rawData.commodityMonthly.filter(r => r.home_team === selectedTeam);
   }, [rawData, selectedTeam, isMarketplace]);
 
+  const commodityProductsByTeam = useMemo(() => {
+    if (!rawData || isMarketplace) return [];
+    return selectedTeam === "ALL"
+      ? rawData.products
+      : rawData.products.filter(r => r.home_team === selectedTeam);
+  }, [rawData, selectedTeam, isMarketplace]);
+
   async function handleLogout() {
     await fetch("/api/analytics/auth", { method: "DELETE" });
     router.push("/analytics/login");
@@ -610,6 +617,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                     <CommodityCompareChart
                       data={commodityMonthlyByTeam}
                       allYears={rawData.summary.years}
+                      products={commodityProductsByTeam}
                     />
                     <TopProductsChart data={chartData.products} productBrn={chartData.productBrn} />
                     <ProductGrowthChart topGrowing={chartData.topGrowing} topDeclining={chartData.topDeclining} currentYear={chartData.growthTargetYear} prevYear={chartData.growthPrevYear} />

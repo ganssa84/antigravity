@@ -133,10 +133,10 @@ function buildPayload(data: Row[]) {
     .sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month)
     .map((r) => ({ ...r, amount: Math.round(r.amount), qty: Math.round(r.qty * 100) / 100 }));
 
-  const productMap: Record<string, { material: string; material_id: string; home_team: string; year: number; amount: number; qty: number }> = {};
+  const productMap: Record<string, { material: string; material_id: string; home_team: string; year: number; commodity: number; amount: number; qty: number }> = {};
   for (const r of data) {
     const k = `${r.material_id}|${r.home_team}|${r.year}`;
-    if (!productMap[k]) productMap[k] = { material: r.material, material_id: r.material_id, home_team: r.home_team, year: r.year, amount: 0, qty: 0 };
+    if (!productMap[k]) productMap[k] = { material: r.material, material_id: r.material_id, home_team: r.home_team, year: r.year, commodity: r.commodity, amount: 0, qty: 0 };
     productMap[k].amount += r.amount;
     productMap[k].qty += r.qty;
   }
