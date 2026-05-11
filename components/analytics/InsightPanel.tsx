@@ -211,7 +211,13 @@ function josaIGA(word: string): string {
 }
 
 function generateInsights(inputs: InsightInputs) {
-  const { tabType, tabName, kpi, yearly, topProducts, partnersAll, growthRate, topGrowing, topDeclining, brnTotals, teams, growthTargetYear, growthPrevYear } = inputs;
+  const { tabType, tabName, kpi, yearly, partnersAll, growthRate, brnTotals, teams, growthTargetYear, growthPrevYear } = inputs;
+
+  // Phase-out 제품은 인사이트에서 제외
+  const isPhaseOut = (name: string) => name.toLowerCase().includes("p/o");
+  const topProducts = inputs.topProducts.filter(p => !isPhaseOut(p.material));
+  const topGrowing = inputs.topGrowing.filter(g => !isPhaseOut(g.material));
+  const topDeclining = inputs.topDeclining.filter(g => !isPhaseOut(g.material));
 
   const summary: string[] = [];
   const insights: string[] = [];
