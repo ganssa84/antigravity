@@ -810,6 +810,20 @@ function StudentCard({
   );
 }
 
+// 학생별 고유 색상 팔레트 (Tailwind 완전한 클래스명)
+const STUDENT_PALETTE = [
+  "bg-violet-200 text-violet-900",
+  "bg-emerald-200 text-emerald-900",
+  "bg-rose-200 text-rose-900",
+  "bg-sky-200 text-sky-900",
+  "bg-amber-200 text-amber-900",
+  "bg-pink-200 text-pink-900",
+  "bg-teal-200 text-teal-900",
+  "bg-indigo-200 text-indigo-900",
+  "bg-orange-200 text-orange-900",
+  "bg-lime-200 text-lime-900",
+];
+
 // ────────────────────────────────────────
 // Tab: 출석 기록
 // ────────────────────────────────────────
@@ -844,7 +858,14 @@ function AttendanceTab() {
     else setMonth(month + 1);
   }
 
-  // 날짜별 그룹 (로컬 타임존 기준)
+  // 학생별 색상 매핑 (이름 가나다 순 → 팔레트 인덱스)
+  const studentNames = [...new Set(records.map(r => r.student?.name ?? r.student_id))]
+    .sort((a, b) => a.localeCompare(b, "ko"));
+  const colorMap = Object.fromEntries(
+    studentNames.map((name, i) => [name, STUDENT_PALETTE[i % STUDENT_PALETTE.length]])
+  );
+
+  // 날짜별 그룹
   const byDate = records.reduce<Record<string, AttendanceRecord[]>>((acc, r) => {
     const d = new Date(r.attended_at);
     const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -854,9 +875,9 @@ function AttendanceTab() {
   }, {});
 
   // 달력 그리드 생성
-  const firstDow   = new Date(year, month - 1, 1).getDay(); // 0=일
+  const firstDow    = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
-  const todayDate  = now.getFullYear() === year && now.getMonth() + 1 === month
+  const todayDate   = now.getFullYear() === year && now.getMonth() + 1 === month
     ? now.getDate() : -1;
 
   const cells: (number | null)[] = [
@@ -879,12 +900,9 @@ function AttendanceTab() {
           {/* 요일 헤더 */}
           <div className="grid grid-cols-7 mb-1">
             {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
-              <div
-                key={d}
-                className={`text-center text-xs font-semibold py-1 ${
-                  i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-gray-400"
-                }`}
-              >
+              <div key={d} className={`text-center text-xs font-semibold py-1 ${
+                i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-gray-400"
+              }`}>
                 {d}
               </div>
             ))}
@@ -901,47 +919,36 @@ function AttendanceTab() {
               const col        = idx % 7;
 
               return (
-                <div
-                  key={idx}
-                  className={`min-h-14 rounded-lg p-1 ${
-                    isToday
-                      ? "bg-amber-50 ring-1 ring-amber-300"
-                      : dayRecords.length > 0
-                      ? "bg-gray-50"
-                      : ""
-                  }`}
-                >
+                <div key={idx} className={`min-h-14 rounded-lg p-1 ${
+                  isToday ? "bg-amber-50 ring-1 ring-amber-300"
+                  : dayRecords.length > 0 ? "bg-gray-50" : ""
+                }`}>
                   {/* 날짜 숫자 */}
-                  <div
-                    className={`text-xs font-bold mb-0.5 ${
-                      isToday
-                        ? "text-amber-600"
-                        : col === 0
-                        ? "text-red-400"
-                        : col === 6
-                        ? "text-blue-400"
-                        : "text-gray-500"
-                    }`}
-                  >
+                  <div className={`text-xs font-bold mb-0.5 ${
+                    isToday ? "text-amber-600"
+                    : col === 0 ? "text-red-400"
+                    : col === 6 ? "text-blue-400"
+                    : "text-gray-500"
+                  }`}>
                     {day}
                   </div>
 
-                  {/* 출석 배지 */}
-                  {dayRecords.map((r) => (
-                    <div
-                      key={r.id}
-                      className={`text-[10px] leading-snug rounded px-0.5 py-0.5 mb-0.5 truncate ${
-                        r.is_noshow
-                          ? "bg-orange-100 text-orange-700"
-                          : r.is_makeup
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                      title={`${r.student?.name} ${r.session_number}/${r.student?.sessions_per_cycle}회차`}
-                    >
-                      {r.student?.name} {r.session_number}/{r.student?.sessions_per_cycle}
-                    </div>
-                  ))}
+                  {/* 출석 배지 — 학생별 고유 색상 */}
+                  {dayRecords.map((r) => {
+                    const name     = r.student?.name ?? r.student_id;
+                    const colorCls = colorMap[name] ?? STUDENT_PALETTE[0];
+                    const prefix   = r.is_noshow ? "✕ " : r.is_makeup ? "+ " : "";
+                    const total    = r.student?.sessions_per_cycle;
+                    return (
+                      <div
+                        key={r.id}
+                        className={`text-[10px] leading-snug rounded px-0.5 py-0.5 mb-0.5 truncate ${colorCls} ${r.is_noshow ? "opacity-60 line-through" : ""}`}
+                        title={`${name} ${r.session_number}/${total}회차${r.is_makeup ? " (보강/추가)" : r.is_noshow ? " (결석차감)" : ""}`}
+                      >
+                        {prefix}{name} {r.session_number}/{total}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -949,17 +956,22 @@ function AttendanceTab() {
         </div>
       )}
 
-      {/* 범례 */}
-      <div className="flex gap-3 text-xs text-gray-500 flex-wrap px-1">
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-green-100 inline-block" />정상출석
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-blue-100 inline-block" />보강/추가
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-orange-100 inline-block" />결석차감
-        </span>
+      {/* 학생별 색상 범례 */}
+      {studentNames.length > 0 && (
+        <div className="flex gap-2 flex-wrap px-1">
+          {studentNames.map(name => (
+            <span key={name} className={`text-xs px-2 py-0.5 rounded-full font-medium ${colorMap[name]}`}>
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 유형 범례 */}
+      <div className="flex gap-3 text-xs text-gray-400 px-1">
+        <span>접두사 없음 = 정상출석</span>
+        <span>+ = 보강/추가</span>
+        <span>✕ = 결석차감</span>
       </div>
     </div>
   );
