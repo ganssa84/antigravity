@@ -5,7 +5,6 @@ import {
   buildAttendanceMessage,
   buildLastSessionMessage,
   buildNoShowMessage,
-  buildDoubleSessionMessage,
 } from "@/lib/solapi";
 
 function isAdmin(req: NextRequest): boolean {
@@ -24,33 +23,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "관리자만 가능합니다." }, { status: 401 });
     }
 
-    // ── 당일 2회 연속 ──
+    // ── 당일 1회 추가 (이미 출석한 날 1회 더) ──
     if (is_double) {
-      // 두 회차 모두 중복 체크 우회 (관리자가 명시적으로 2회 처리 요청)
-      const r1 = await markAttendance(student_id, true);
-      const r2 = await markAttendance(student_id, true);
+      const result = await markAttendance(student_id, true);
+      const { attendance, student, isLastSession, sessionNumber, totalSessions } = result;
 
-      const hasPayment = r1.isLastSession || r2.isLastSession;
-      const text = buildDoubleSessionMessage(
-        r1.student.name,
-        r1.sessionNumber,
-        r2.sessionNumber,
-        r2.totalSessions,
-        hasPayment
-      );
+      const text = isLastSession
+        ? buildLastSessionMessage(student.name, totalSessions)
+        : buildAttendanceMessage(student.name, sessionNumber, totalSessions);
 
       let smsSent = false;
       try {
-        await sendSMS(r1.student.parent_phone, text);
-        await updateKakaoSent(r1.attendance.id);
-        await updateKakaoSent(r2.attendance.id);
+        await sendSMS(student.parent_phone, text);
+        await updateKakaoSent(attendance.id);
         smsSent = true;
       } catch (e) {
-        console.error("[솔라피] 당일2회 발송 실패:", e);
+        console.error("[솔라피] 당일추가 발송 실패:", e);
       }
       await logMessage({
-        recipient: r1.student.name,
-        phone: r1.student.parent_phone,
+        recipient: student.name,
+        phone: student.parent_phone,
         message: text,
         type: "attendance",
         success: smsSent,
@@ -58,10 +50,10 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        studentName: r1.student.name,
-        session1: r1.sessionNumber,
-        session2: r2.sessionNumber,
-        totalSessions: r2.totalSessions,
+        studentName: student.name,
+        sessionNumber,
+        totalSessions,
+        isLastSession,
         message: text,
       });
     }

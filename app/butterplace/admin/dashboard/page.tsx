@@ -680,18 +680,17 @@ function StudentsTab() {
         </Modal>
       )}
 
-      {/* 당일 2회 확인 모달 */}
+      {/* 당일 1회 추가 확인 모달 */}
       {confirmDouble && (
         <Modal onClose={() => setConfirmDouble(null)}>
-          <h2 className="text-xl font-bold mb-3 text-purple-600">당일 2회 연속 수업</h2>
+          <h2 className="text-xl font-bold mb-3 text-purple-600">당일 1회 추가</h2>
           <p className="text-gray-600 mb-2">
-            <strong>{confirmDouble.name}</strong> 학생의 오늘 수업을 2회 연속으로 처리합니다.
+            <strong>{confirmDouble.name}</strong> 학생이 오늘 이미 출석한 상태에서 1회를 추가합니다.
           </p>
           <div className="bg-purple-50 rounded-xl p-3 mb-5 text-sm text-purple-700 space-y-1">
             <p>• 현재 {confirmDouble.current_session}/{confirmDouble.sessions_per_cycle}회차 →
-              {" "}2회차 연속 처리</p>
-            <p>• 부모님께 연속 수업 완료 알림 1건 발송</p>
-            <p className="text-xs text-purple-500">※ 오늘 이미 키오스크에서 출석했다면 사용하지 마세요</p>
+              {" "}{confirmDouble.current_session + 1}/{confirmDouble.sessions_per_cycle}회차 추가</p>
+            <p>• 부모님께 추가 출석 알림이 발송됩니다</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -704,7 +703,7 @@ function StudentsTab() {
               onClick={() => handleDouble(confirmDouble)}
               className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl py-2"
             >
-              2회 처리
+              1회 추가
             </button>
           </div>
         </Modal>
@@ -775,7 +774,7 @@ function StudentCard({
         <ActionBtn onClick={onProxy} label="대신출석" color="green" />
         <ActionBtn onClick={onMakeup} label="보강" color="blue" />
         <ActionBtn onClick={onNoShow} label="결석차감" color="orange" />
-        <ActionBtn onClick={onDouble} label="당일2회" color="purple" />
+        <ActionBtn onClick={onDouble} label="당일1회추가" color="purple" />
         <ActionBtn onClick={onReset} label="회차초기화" color="gray" />
         <ActionBtn onClick={onToggle} label={student.is_active ? "비활성" : "활성화"} color="gray" />
         <ActionBtn onClick={onDelete} label="삭제" color="red" />
