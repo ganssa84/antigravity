@@ -261,6 +261,7 @@ function StudentsTab() {
   const [addMakeup, setAddMakeup] = useState<Student | null>(null);
   const [confirmNoShow, setConfirmNoShow] = useState<Student | null>(null);
   const [confirmDouble, setConfirmDouble] = useState<Student | null>(null);
+  const [confirmProxy, setConfirmProxy] = useState<Student | null>(null);
 
   const fetchStudents = useCallback(async () => {
     setLoading(true);
@@ -357,6 +358,16 @@ function StudentsTab() {
     fetchStudents();
   }
 
+  async function handleProxy(s: Student) {
+    await fetch("/api/butterplace/attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ student_id: s.id, is_makeup: true }),
+    });
+    setConfirmProxy(null);
+    fetchStudents();
+  }
+
   async function handleNoShow(s: Student) {
     await fetch("/api/butterplace/attendance", {
       method: "POST",
@@ -404,6 +415,7 @@ function StudentsTab() {
             onToggle={() => toggleActive(s)}
             onReset={() => resetSession(s)}
             onMakeup={() => setAddMakeup(s)}
+            onProxy={() => setConfirmProxy(s)}
             onNoShow={() => setConfirmNoShow(s)}
             onDouble={() => setConfirmDouble(s)}
             onDelete={() => setConfirmDelete(s)}
@@ -424,6 +436,7 @@ function StudentsTab() {
                 onToggle={() => toggleActive(s)}
                 onReset={() => resetSession(s)}
                 onMakeup={() => setAddMakeup(s)}
+                onProxy={() => setConfirmProxy(s)}
                 onNoShow={() => setConfirmNoShow(s)}
                 onDouble={() => setConfirmDouble(s)}
                 onDelete={() => setConfirmDelete(s)}
@@ -579,6 +592,35 @@ function StudentsTab() {
         </Modal>
       )}
 
+      {/* 대신 출석 확인 모달 */}
+      {confirmProxy && (
+        <Modal onClose={() => setConfirmProxy(null)}>
+          <h2 className="text-xl font-bold mb-3">대신 출석 처리</h2>
+          <p className="text-gray-600 mb-2">
+            <strong>{confirmProxy.name}</strong> 학생이 키오스크에서 이름을 누르지 못한 경우 사용합니다.
+          </p>
+          <div className="bg-green-50 rounded-xl p-3 mb-5 text-sm text-green-700 space-y-1">
+            <p>• {confirmProxy.current_session}/{confirmProxy.sessions_per_cycle}회차 →
+              {" "}{confirmProxy.current_session + 1}/{confirmProxy.sessions_per_cycle}회차 처리</p>
+            <p>• 부모님께 정상 출석 알림이 발송됩니다</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirmProxy(null)}
+              className="flex-1 border border-gray-300 rounded-xl py-2 text-gray-600"
+            >
+              취소
+            </button>
+            <button
+              onClick={() => handleProxy(confirmProxy)}
+              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl py-2"
+            >
+              출석 처리
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {/* 결석 차감 확인 모달 */}
       {confirmNoShow && (
         <Modal onClose={() => setConfirmNoShow(null)}>
@@ -647,6 +689,7 @@ function StudentCard({
   onToggle,
   onReset,
   onMakeup,
+  onProxy,
   onNoShow,
   onDouble,
   onDelete,
@@ -656,6 +699,7 @@ function StudentCard({
   onToggle: () => void;
   onReset: () => void;
   onMakeup: () => void;
+  onProxy: () => void;
   onNoShow: () => void;
   onDouble: () => void;
   onDelete: () => void;
@@ -698,6 +742,7 @@ function StudentCard({
       {/* 액션 버튼 */}
       <div className="flex gap-2 flex-wrap">
         <ActionBtn onClick={onEdit} label="수정" />
+        <ActionBtn onClick={onProxy} label="대신출석" color="green" />
         <ActionBtn onClick={onMakeup} label="보강" color="blue" />
         <ActionBtn onClick={onNoShow} label="결석차감" color="orange" />
         <ActionBtn onClick={onDouble} label="당일2회" color="purple" />
@@ -1087,7 +1132,7 @@ function ActionBtn({
 }: {
   onClick: () => void;
   label: string;
-  color?: "amber" | "blue" | "red" | "gray" | "orange" | "purple";
+  color?: "amber" | "blue" | "red" | "gray" | "orange" | "purple" | "green";
 }) {
   const colors = {
     amber:  "bg-amber-100 text-amber-700 hover:bg-amber-200",
@@ -1096,6 +1141,7 @@ function ActionBtn({
     gray:   "bg-gray-100 text-gray-600 hover:bg-gray-200",
     orange: "bg-orange-100 text-orange-700 hover:bg-orange-200",
     purple: "bg-purple-100 text-purple-700 hover:bg-purple-200",
+    green:  "bg-green-100 text-green-700 hover:bg-green-200",
   };
   return (
     <button
