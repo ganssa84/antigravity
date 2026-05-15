@@ -262,6 +262,7 @@ function StudentsTab() {
   const [confirmNoShow, setConfirmNoShow] = useState<Student | null>(null);
   const [confirmDouble, setConfirmDouble] = useState<Student | null>(null);
   const [confirmProxy, setConfirmProxy] = useState<Student | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchStudents = useCallback(async () => {
     setLoading(true);
@@ -359,31 +360,46 @@ function StudentsTab() {
   }
 
   async function handleProxy(s: Student) {
-    await fetch("/api/butterplace/attendance", {
+    const res = await fetch("/api/butterplace/attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ student_id: s.id, is_makeup: true }),
     });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error ?? "오류가 발생했습니다.");
+      return;
+    }
     setConfirmProxy(null);
     fetchStudents();
   }
 
   async function handleNoShow(s: Student) {
-    await fetch("/api/butterplace/attendance", {
+    const res = await fetch("/api/butterplace/attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ student_id: s.id, is_noshow: true }),
     });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error ?? "오류가 발생했습니다.");
+      return;
+    }
     setConfirmNoShow(null);
     fetchStudents();
   }
 
   async function handleDouble(s: Student) {
-    await fetch("/api/butterplace/attendance", {
+    const res = await fetch("/api/butterplace/attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ student_id: s.id, is_double: true }),
     });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error ?? "오류가 발생했습니다.");
+      return;
+    }
     setConfirmDouble(null);
     fetchStudents();
   }
@@ -589,6 +605,20 @@ function StudentsTab() {
               추가
             </button>
           </div>
+        </Modal>
+      )}
+
+      {/* 액션 오류 모달 */}
+      {actionError && (
+        <Modal onClose={() => setActionError(null)}>
+          <h2 className="text-xl font-bold mb-3 text-red-600">처리 실패</h2>
+          <p className="text-gray-600 mb-5">{actionError}</p>
+          <button
+            onClick={() => setActionError(null)}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl py-2"
+          >
+            확인
+          </button>
         </Modal>
       )}
 

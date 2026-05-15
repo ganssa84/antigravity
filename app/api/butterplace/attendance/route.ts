@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
 
     // ── 당일 2회 연속 ──
     if (is_double) {
-      const r1 = await markAttendance(student_id, false);
+      // 두 회차 모두 중복 체크 우회 (관리자가 명시적으로 2회 처리 요청)
+      const r1 = await markAttendance(student_id, true);
       const r2 = await markAttendance(student_id, true);
 
       const hasPayment = r1.isLastSession || r2.isLastSession;
