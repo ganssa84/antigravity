@@ -243,6 +243,7 @@ function StudentsTab() {
   const [modal, setModal] = useState<{ mode: "add" | "edit"; student?: Student } | null>(null);
   const [form, setForm] = useState<Partial<Student>>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
   const [addMakeup, setAddMakeup] = useState<Student | null>(null);
 
@@ -274,24 +275,37 @@ function StudentsTab() {
   async function saveStudent() {
     if (!form.name || !form.parent_phone) return;
     setSaving(true);
+    setSaveError(null);
 
-    if (modal?.mode === "add") {
-      await fetch("/api/butterplace/students", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-    } else if (modal?.student) {
-      await fetch(`/api/butterplace/students/${modal.student.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+    try {
+      let res: Response;
+      if (modal?.mode === "add") {
+        res = await fetch("/api/butterplace/students", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+      } else {
+        res = await fetch(`/api/butterplace/students/${modal!.student!.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+      }
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setSaveError(json.error ?? `저장 실패 (${res.status})`);
+        return;
+      }
+
+      setModal(null);
+      fetchStudents();
+    } catch {
+      setSaveError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    setModal(null);
-    fetchStudents();
   }
 
   async function deleteStudent(s: Student) {
@@ -456,7 +470,10 @@ function StudentsTab() {
               />
             </Field>
           </div>
-          <div className="flex gap-2 mt-5">
+          {saveError && (
+            <p className="text-red-500 text-sm text-center mt-3">{saveError}</p>
+          )}
+          <div className="flex gap-2 mt-3">
             <button
               onClick={() => setModal(null)}
               className="flex-1 border border-gray-300 rounded-xl py-2 text-gray-600"
