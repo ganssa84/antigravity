@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { markAttendance, updateKakaoSent, getAllAttendanceByMonth } from "@/lib/butterplace-db";
+import { markAttendance, updateKakaoSent, getAllAttendanceByMonth, logMessage } from "@/lib/butterplace-db";
 import { sendSMS, buildAttendanceMessage, buildLastSessionMessage } from "@/lib/solapi";
 
 function isAdmin(req: NextRequest): boolean {
@@ -25,12 +25,21 @@ export async function POST(req: NextRequest) {
       ? buildLastSessionMessage(student.name, totalSessions)
       : buildAttendanceMessage(student.name, sessionNumber, totalSessions);
 
+    let smsSent = false;
     try {
       await sendSMS(student.parent_phone, text);
       await updateKakaoSent(attendance.id);
+      smsSent = true;
     } catch (e) {
       console.error("[솔라피] 발송 실패:", e);
     }
+    await logMessage({
+      recipient: student.name,
+      phone: student.parent_phone,
+      message: text,
+      type: "attendance",
+      success: smsSent,
+    });
 
     return NextResponse.json({
       success: true,

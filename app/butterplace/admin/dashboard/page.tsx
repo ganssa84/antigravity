@@ -30,7 +30,17 @@ interface AttendanceRecord {
   student: Student;
 }
 
-type Tab = "today" | "students" | "attendance" | "message";
+type Tab = "today" | "students" | "attendance" | "message" | "history";
+
+interface MessageLog {
+  id: string;
+  sent_at: string;
+  recipient: string;
+  phone: string;
+  message: string;
+  type: "attendance" | "bulk";
+  success: boolean;
+}
 
 // ────────────────────────────────────────
 // 빈 학생 폼
@@ -92,6 +102,7 @@ export default function AdminDashboard() {
             { key: "students",   label: "학생 관리", icon: "👧" },
             { key: "attendance", label: "출석 기록", icon: "📋" },
             { key: "message",    label: "메시지 발송", icon: "💬" },
+            { key: "history",    label: "발송 히스토리", icon: "📜" },
           ] as { key: Tab; label: string; icon: string }[]
         ).map((t) => (
           <button
@@ -115,6 +126,7 @@ export default function AdminDashboard() {
         {tab === "students"   && <StudentsTab />}
         {tab === "attendance" && <AttendanceTab />}
         {tab === "message"    && <MessageTab />}
+        {tab === "history"    && <HistoryTab />}
       </main>
     </div>
   );
@@ -812,6 +824,88 @@ function MessageTab() {
       >
         {sending ? "발송 중..." : `💬 ${targets.length}명에게 발송`}
       </button>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────
+// Tab: 발송 히스토리
+// ────────────────────────────────────────
+function HistoryTab() {
+  const [logs, setLogs] = useState<MessageLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res  = await fetch("/api/butterplace/message/history");
+      const json = await res.json().catch(() => ({}));
+      setLogs(json.logs ?? []);
+    } catch {
+      // 에러나도 로딩 종료
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-700">발송 히스토리</h2>
+        <button
+          onClick={fetchLogs}
+          className="text-sm text-amber-600 hover:text-amber-700 font-semibold"
+        >
+          새로고침
+        </button>
+      </div>
+
+      {logs.length === 0 ? (
+        <EmptyMsg msg="발송 기록이 없습니다" />
+      ) : (
+        <div className="space-y-2">
+          {logs.map((log) => {
+            const d = new Date(log.sent_at);
+            const dateStr = d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", weekday: "short" });
+            const timeStr = d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+            return (
+              <div
+                key={log.id}
+                className={`bg-white rounded-2xl shadow-sm p-4 border ${log.success ? "border-gray-100" : "border-red-200"}`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-sm">{log.recipient}</span>
+                    <span className="text-xs text-gray-400">{log.phone}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      log.type === "attendance"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-blue-100 text-blue-700"
+                    }`}>
+                      {log.type === "attendance" ? "출석" : "공지"}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      log.success
+                        ? "bg-gray-100 text-gray-600"
+                        : "bg-red-100 text-red-600"
+                    }`}>
+                      {log.success ? "✓ 발송됨" : "✗ 실패"}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-400 whitespace-nowrap">
+                    {dateStr} {timeStr}
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 line-clamp-2 leading-snug">{log.message}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -240,3 +240,27 @@ export async function updateKakaoSent(attendanceId: string): Promise<void> {
     .eq("id", attendanceId);
   if (error) throw error;
 }
+
+export interface MessageLog {
+  id: string;
+  sent_at: string;
+  recipient: string;
+  phone: string;
+  message: string;
+  type: "attendance" | "bulk";
+  success: boolean;
+}
+
+export async function logMessage(log: Omit<MessageLog, "id" | "sent_at">): Promise<void> {
+  await getClient().from("bp_message_log").insert(log);
+}
+
+export async function getMessageLogs(limit = 100): Promise<MessageLog[]> {
+  const { data, error } = await getClient()
+    .from("bp_message_log")
+    .select("*")
+    .order("sent_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}

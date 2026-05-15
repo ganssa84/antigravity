@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllStudents, getStudentById } from "@/lib/butterplace-db";
+import { getAllStudents, getStudentById, logMessage } from "@/lib/butterplace-db";
 import { sendSMS, sendBulkSMS } from "@/lib/solapi";
 
 export async function POST(req: NextRequest) {
@@ -32,13 +32,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "발송할 수신자가 없습니다." }, { status: 400 });
     }
 
-    if (messages.length === 1) {
-      await sendSMS(messages[0].to, messages[0].text);
-    } else {
-      await sendBulkSMS(messages);
+    let success = true;
+    try {
+      if (messages.length === 1) {
+        await sendSMS(messages[0].to, messages[0].text);
+      } else {
+        await sendBulkSMS(messages);
+      }
+    } catch (e) {
+      success = false;
+      console.error("[솔라피] 일괄 발송 실패:", e);
     }
 
-    return NextResponse.json({ success: true, sent: messages.length });
+    // 발송 내역 기록
+    await Promise.all(
+      messages.map((m) =>
+        logMessage({ recipient: m.to, phone: m.to, message: m.text, type: "bulk", success })
+      )
+    );
+
+    return NextResponse.json({ success, sent: messages.length });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "오류";
     return NextResponse.json({ error: msg }, { status: 500 });
