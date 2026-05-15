@@ -118,6 +118,15 @@ export function buildNoShowMessage(
   return `[버터플레이스] ${name} 학생이 ${dateLabel} 예정된 수업에 불참하셨습니다. ${sessionNumber}/${totalSessions}회차가 차감되었습니다.`;
 }
 
+export function buildCancelMessage(
+  name: string,
+  prevSession: number,
+  totalSessions: number,
+  dateLabel: string
+): string {
+  return `[버터플레이스] ${name} 학생의 ${dateLabel} 출석이 잘못 처리되어 취소되었습니다. 현재 ${prevSession}/${totalSessions}회차입니다.`;
+}
+
 export function buildDoubleSessionMessage(
   name: string,
   s1: number,

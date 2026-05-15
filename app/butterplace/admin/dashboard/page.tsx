@@ -259,6 +259,7 @@ function StudentsTab() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
   const [addMakeup, setAddMakeup] = useState<Student | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<Student | null>(null);
   const [confirmNoShow, setConfirmNoShow] = useState<Student | null>(null);
   const [confirmDouble, setConfirmDouble] = useState<Student | null>(null);
   const [confirmProxy, setConfirmProxy] = useState<Student | null>(null);
@@ -347,6 +348,21 @@ function StudentsTab() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ current_session: 0 }),
     });
+    fetchStudents();
+  }
+
+  async function handleCancelLast(s: Student) {
+    const res = await fetch("/api/butterplace/attendance/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ student_id: s.id }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error ?? "오류가 발생했습니다.");
+      return;
+    }
+    setConfirmCancel(null);
     fetchStudents();
   }
 
@@ -451,6 +467,7 @@ function StudentsTab() {
             onProxy={() => setConfirmProxy(s)}
             onNoShow={() => setConfirmNoShow(s)}
             onDouble={() => setConfirmDouble(s)}
+            onCancel={() => setConfirmCancel(s)}
             onDelete={() => setConfirmDelete(s)}
           />
         ))}
@@ -472,6 +489,7 @@ function StudentsTab() {
                 onProxy={() => setConfirmProxy(s)}
                 onNoShow={() => setConfirmNoShow(s)}
                 onDouble={() => setConfirmDouble(s)}
+                onCancel={() => setConfirmCancel(s)}
                 onDelete={() => setConfirmDelete(s)}
               />
             ))}
@@ -649,6 +667,36 @@ function StudentsTab() {
         </Modal>
       )}
 
+      {/* 마지막 출석 취소 모달 */}
+      {confirmCancel && (
+        <Modal onClose={() => setConfirmCancel(null)}>
+          <h2 className="text-xl font-bold mb-3 text-red-600">마지막 출석 취소</h2>
+          <p className="text-gray-600 mb-2">
+            <strong>{confirmCancel.name}</strong> 학생의 가장 최근 출석 1건을 취소합니다.
+          </p>
+          <div className="bg-red-50 rounded-xl p-3 mb-5 text-sm text-red-700 space-y-1">
+            <p>• 현재 {confirmCancel.current_session}/{confirmCancel.sessions_per_cycle}회차 →
+              {" "}{Math.max(0, confirmCancel.current_session - 1)}/{confirmCancel.sessions_per_cycle}회차로 복원</p>
+            <p>• 부모님께 출석 취소 알림이 발송됩니다</p>
+            <p className="text-xs text-red-400">※ 이름을 잘못 눌렀을 때 사용하세요</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirmCancel(null)}
+              className="flex-1 border border-gray-300 rounded-xl py-2 text-gray-600"
+            >
+              취소
+            </button>
+            <button
+              onClick={() => handleCancelLast(confirmCancel)}
+              className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl py-2"
+            >
+              출석 취소
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {/* 대신 출석 확인 모달 */}
       {confirmProxy && (
         <Modal onClose={() => setConfirmProxy(null)}>
@@ -748,6 +796,7 @@ function StudentCard({
   onProxy,
   onNoShow,
   onDouble,
+  onCancel,
   onDelete,
 }: {
   student: Student;
@@ -758,6 +807,7 @@ function StudentCard({
   onProxy: () => void;
   onNoShow: () => void;
   onDouble: () => void;
+  onCancel: () => void;
   onDelete: () => void;
 }) {
   const progress = student.current_session / student.sessions_per_cycle;
@@ -802,6 +852,7 @@ function StudentCard({
         <ActionBtn onClick={onMakeup} label="보강" color="blue" />
         <ActionBtn onClick={onNoShow} label="결석차감" color="orange" />
         <ActionBtn onClick={onDouble} label="당일1회추가" color="purple" />
+        <ActionBtn onClick={onCancel} label="출석취소" color="red" />
         <ActionBtn onClick={onReset} label="회차초기화" color="gray" />
         <ActionBtn onClick={onToggle} label={student.is_active ? "비활성" : "활성화"} color="gray" />
         <ActionBtn onClick={onDelete} label="삭제" color="red" />

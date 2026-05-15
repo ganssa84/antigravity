@@ -270,6 +270,49 @@ export async function logMessage(log: Omit<MessageLog, "id" | "sent_at">): Promi
   await getClient().from("bp_message_log").insert(log);
 }
 
+export interface CancelResult {
+  student: Student;
+  canceledSession: number;
+  totalSessions: number;
+  attendedAt: string;
+}
+
+export async function cancelLastAttendance(studentId: string): Promise<CancelResult> {
+  const client = getClient();
+
+  const student = await getStudentById(studentId);
+  if (!student) throw new Error("학생을 찾을 수 없습니다.");
+  if (!student.is_active) throw new Error("비활성 학생입니다.");
+
+  const { data: last, error: fetchErr } = await client
+    .from("bp_attendance")
+    .select("*")
+    .eq("student_id", studentId)
+    .order("attended_at", { ascending: false })
+    .limit(1)
+    .single();
+  if (fetchErr || !last) throw new Error("취소할 출석 기록이 없습니다.");
+
+  const { error: delErr } = await client
+    .from("bp_attendance")
+    .delete()
+    .eq("id", last.id);
+  if (delErr) throw delErr;
+
+  // session_number - 1 로 복원, cycle도 기록 당시 cycle로 복원
+  const updatedStudent = await updateStudent(studentId, {
+    current_session: last.session_number - 1,
+    current_cycle: last.cycle_number,
+  });
+
+  return {
+    student: updatedStudent,
+    canceledSession: last.session_number,
+    totalSessions: student.sessions_per_cycle,
+    attendedAt: last.attended_at,
+  };
+}
+
 export async function getMessageLogs(limit = 100): Promise<MessageLog[]> {
   const { data, error } = await getClient()
     .from("bp_message_log")
