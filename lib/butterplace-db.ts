@@ -119,9 +119,14 @@ export async function deleteStudent(id: string): Promise<void> {
 // ────────────────────────────────────────
 
 function todayRange(): { start: string; end: string } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  // Vercel 서버는 UTC — KST(+9) 기준 오늘 자정을 UTC로 계산
+  const KST = 9 * 60 * 60 * 1000;
+  const nowKST = new Date(Date.now() + KST);
+  const y = nowKST.getUTCFullYear();
+  const m = nowKST.getUTCMonth();
+  const d = nowKST.getUTCDate();
+  const start = new Date(Date.UTC(y, m, d) - KST);     // KST 00:00 → UTC 전날 15:00
+  const end   = new Date(Date.UTC(y, m, d + 1) - KST); // KST 다음날 00:00 → UTC 15:00
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
