@@ -834,15 +834,21 @@ function MessageTab() {
 function HistoryTab() {
   const [logs, setLogs] = useState<MessageLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res  = await fetch("/api/butterplace/message/history");
       const json = await res.json().catch(() => ({}));
-      setLogs(json.logs ?? []);
-    } catch {
-      // 에러나도 로딩 종료
+      if (!res.ok) {
+        setError(json.error ?? `오류 (${res.status})`);
+      } else {
+        setLogs(json.logs ?? []);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "네트워크 오류");
     } finally {
       setLoading(false);
     }
@@ -864,9 +870,17 @@ function HistoryTab() {
         </button>
       </div>
 
-      {logs.length === 0 ? (
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-600">
+          <p className="font-semibold mb-1">오류 발생</p>
+          <p>{error}</p>
+          <p className="mt-2 text-xs text-red-400">Supabase에서 bp_message_log 테이블이 생성되어 있는지 확인해주세요.</p>
+        </div>
+      )}
+
+      {!error && logs.length === 0 ? (
         <EmptyMsg msg="발송 기록이 없습니다" />
-      ) : (
+      ) : !error && (
         <div className="space-y-2">
           {logs.map((log) => {
             const d = new Date(log.sent_at);
@@ -900,7 +914,7 @@ function HistoryTab() {
                     {dateStr} {timeStr}
                   </div>
                 </div>
-                <p className="text-sm text-gray-600 line-clamp-2 leading-snug">{log.message}</p>
+                <p className="text-sm text-gray-600 leading-snug whitespace-pre-wrap">{log.message}</p>
               </div>
             );
           })}
