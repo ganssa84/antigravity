@@ -11,19 +11,23 @@ function isAdmin(req: NextRequest): boolean {
   return req.cookies.get("bp_admin")?.value === "authenticated";
 }
 
-function makeDateLabel(attendedAt?: string): string {
-  if (!attendedAt) return "오늘";
-  // UTC → KST(+9) 변환 후 "M월 D일(요일)" 형식으로 반환
-  const kst = new Date(new Date(attendedAt).getTime() + 9 * 60 * 60 * 1000);
-  const month = kst.getUTCMonth() + 1;
-  const day   = kst.getUTCDate();
-  const week  = ["일", "월", "화", "수", "목", "금", "토"][kst.getUTCDay()];
-  return `${month}월 ${day}일(${week})`;
+// date: "YYYY-MM-DD" → "M월 D일(요일)" or "오늘"
+function makeDateLabel(date?: string): string {
+  if (!date) return "오늘";
+  const [y, m, d] = date.split("-").map(Number);
+  const week = ["일", "월", "화", "수", "목", "금", "토"][new Date(y, m - 1, d).getDay()];
+  return `${m}월 ${d}일(${week})`;
+}
+
+// date: "YYYY-MM-DD" → Supabase에 저장할 ISO 타임스탬프 (한국 정오 기준)
+function makeAttendedAt(date?: string): string | undefined {
+  if (!date) return undefined;
+  return `${date}T12:00:00+09:00`;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { student_id, is_makeup = false, is_noshow = false, is_double = false, attended_at } = await req.json();
+    const { student_id, is_makeup = false, is_noshow = false, is_double = false, date } = await req.json();
 
     if (!student_id) {
       return NextResponse.json({ error: "student_id가 필요합니다." }, { status: 400 });
@@ -70,10 +74,11 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 일반 출석 / 보강 / 결석 차감 ──
-    const result = await markAttendance(student_id, is_makeup, is_noshow, attended_at);
+    const attendedAt = makeAttendedAt(date);
+    const result = await markAttendance(student_id, is_makeup, is_noshow, attendedAt);
     const { attendance, student, isLastSession, sessionNumber, totalSessions } = result;
 
-    const dateLabel = makeDateLabel(attended_at);
+    const dateLabel = makeDateLabel(date);
     let text: string;
     if (is_noshow) {
       text = buildNoShowMessage(student.name, sessionNumber, totalSessions, dateLabel);

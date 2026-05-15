@@ -358,14 +358,14 @@ function StudentsTab() {
   }
 
   async function handleMakeup(s: Student) {
-    // makeupDate를 선택한 날 자정(KST→UTC)으로 변환해서 전달
-    const attendedAt = makeupDate
-      ? new Date(`${makeupDate}T12:00:00`).toISOString()
-      : undefined;
     const res = await fetch("/api/butterplace/attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ student_id: s.id, is_makeup: true, attended_at: attendedAt }),
+      body: JSON.stringify({
+        student_id: s.id,
+        is_makeup: true,
+        date: makeupDate || undefined,  // "YYYY-MM-DD" 그대로 전달
+      }),
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
