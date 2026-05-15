@@ -1,13 +1,9 @@
-import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("bp_admin");
-
+export async function GET(req: NextRequest) {
+  const token = req.cookies.get("bp_admin");
   if (!token || token.value !== "authenticated") {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
-
   return NextResponse.json({ authenticated: true });
 }

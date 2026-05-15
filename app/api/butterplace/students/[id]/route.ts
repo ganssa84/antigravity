@@ -1,40 +1,45 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { updateStudent, deleteStudent, getStudentById } from "@/lib/butterplace-db";
 
-async function isAdmin(): Promise<boolean> {
-  const store = await cookies();
-  return store.get("bp_admin")?.value === "authenticated";
+function isAdmin(req: NextRequest): boolean {
+  return req.cookies.get("bp_admin")?.value === "authenticated";
 }
 
-// PUT /api/butterplace/students/[id]  — 학생 수정
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+  if (!isAdmin(req)) {
     return NextResponse.json({ error: "인증 필요" }, { status: 401 });
   }
 
-  const { id } = await params;
-  const body = await req.json();
+  try {
+    const { id } = await params;
+    const body = await req.json();
 
-  // sessions_per_cycle 변경 시 current_session이 새 값을 초과하지 않도록 조정
-  if (body.sessions_per_cycle !== undefined) {
-    const student = await getStudentById(id);
-    if (student && student.current_session > body.sessions_per_cycle) {
-      body.current_session = 0;
+    if (body.sessions_per_cycle !== undefined) {
+      const student = await getStudentById(id);
+      if (student && student.current_session > body.sessions_per_cycle) {
+        body.current_session = 0;
+      }
     }
-  }
 
-  const student = await updateStudent(id, body);
-  return NextResponse.json({ student });
+    const student = await updateStudent(id, body);
+    return NextResponse.json({ student });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "오류";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
-// DELETE /api/butterplace/students/[id]  — 학생 삭제
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isAdmin(req)) {
     return NextResponse.json({ error: "인증 필요" }, { status: 401 });
   }
 
-  const { id } = await params;
-  await deleteStudent(id);
-  return NextResponse.json({ success: true });
+  try {
+    const { id } = await params;
+    await deleteStudent(id);
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "오류";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
