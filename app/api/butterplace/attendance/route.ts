@@ -11,12 +11,18 @@ function isAdmin(req: NextRequest): boolean {
   return req.cookies.get("bp_admin")?.value === "authenticated";
 }
 
-// date: "YYYY-MM-DD" → "M월 D일(요일)" or "오늘"
+// date: "YYYY-MM-DD" → "M월 D일(요일)" / 미입력 시 오늘 KST 날짜
 function makeDateLabel(date?: string): string {
-  if (!date) return "오늘";
-  const [y, m, d] = date.split("-").map(Number);
-  const week = ["일", "월", "화", "수", "목", "금", "토"][new Date(y, m - 1, d).getDay()];
-  return `${m}월 ${d}일(${week})`;
+  const weeks = ["일", "월", "화", "수", "목", "금", "토"];
+  if (date) {
+    const [y, m, d] = date.split("-").map(Number);
+    return `${m}월 ${d}일(${weeks[new Date(y, m - 1, d).getDay()]})`;
+  }
+  // 서버(UTC)에서 KST(+9) 오늘 날짜 계산
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const m = kst.getUTCMonth() + 1;
+  const d = kst.getUTCDate();
+  return `${m}월 ${d}일(${weeks[kst.getUTCDay()]})`;
 }
 
 // date: "YYYY-MM-DD" → Supabase에 저장할 ISO 타임스탬프 (한국 정오 기준)
@@ -42,10 +48,10 @@ export async function POST(req: NextRequest) {
       const result = await markAttendance(student_id, true);
       const { attendance, student, isLastSession, sessionNumber, totalSessions } = result;
 
+      const todayLabel = makeDateLabel();
       const text = isLastSession
-        ? buildLastSessionMessage(student.name, totalSessions)
-        : buildAttendanceMessage(student.name, sessionNumber, totalSessions);
-      // 당일1회추가는 항상 오늘 날짜이므로 dateLabel 불필요
+        ? buildLastSessionMessage(student.name, totalSessions, todayLabel)
+        : buildAttendanceMessage(student.name, sessionNumber, totalSessions, todayLabel);
 
       let smsSent = false;
       try {
