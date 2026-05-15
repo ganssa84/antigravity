@@ -130,15 +130,20 @@ function TodayTab() {
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
-    const [todayRes, studentsRes] = await Promise.all([
-      fetch("/api/butterplace/attendance/today"),
-      fetch("/api/butterplace/students?scope=all"),
-    ]);
-    const todayJson   = await todayRes.json();
-    const studentsJson = await studentsRes.json();
-    setRecords(todayJson.records ?? []);
-    setAllStudents((studentsJson.students ?? []).filter((s: Student) => s.is_active));
-    setLoading(false);
+    try {
+      const [todayRes, studentsRes] = await Promise.all([
+        fetch("/api/butterplace/attendance/today"),
+        fetch("/api/butterplace/students?scope=all"),
+      ]);
+      const todayJson    = await todayRes.json().catch(() => ({}));
+      const studentsJson = await studentsRes.json().catch(() => ({}));
+      setRecords(todayJson.records ?? []);
+      setAllStudents((studentsJson.students ?? []).filter((s: Student) => s.is_active));
+    } catch {
+      // 에러가 나도 로딩 종료
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetch_(); }, [fetch_]);
