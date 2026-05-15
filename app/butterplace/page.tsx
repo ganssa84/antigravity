@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 interface Student {
   id: string;
@@ -37,10 +37,17 @@ export default function KioskPage() {
   const [success, setSuccess] = useState<SuccessInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
+  const loadedDateRef = useRef(new Date().toDateString());
 
-  // 시계
+  // 시계 + 자정 감지
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
+    const t = setInterval(() => {
+      const current = new Date();
+      setNow(current);
+      if (current.toDateString() !== loadedDateRef.current) {
+        window.location.reload();
+      }
+    }, 1000);
     return () => clearInterval(t);
   }, []);
 
