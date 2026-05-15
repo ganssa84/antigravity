@@ -263,6 +263,7 @@ function StudentsTab() {
   const [confirmDouble, setConfirmDouble] = useState<Student | null>(null);
   const [confirmProxy, setConfirmProxy] = useState<Student | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [makeupDate, setMakeupDate] = useState<string>("");
 
   const fetchStudents = useCallback(async () => {
     setLoading(true);
@@ -349,12 +350,28 @@ function StudentsTab() {
     fetchStudents();
   }
 
+  function openMakeup(s: Student) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    setMakeupDate(yesterday.toISOString().slice(0, 10));
+    setAddMakeup(s);
+  }
+
   async function handleMakeup(s: Student) {
-    await fetch("/api/butterplace/attendance", {
+    // makeupDate를 선택한 날 자정(KST→UTC)으로 변환해서 전달
+    const attendedAt = makeupDate
+      ? new Date(`${makeupDate}T12:00:00`).toISOString()
+      : undefined;
+    const res = await fetch("/api/butterplace/attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ student_id: s.id, is_makeup: true }),
+      body: JSON.stringify({ student_id: s.id, is_makeup: true, attended_at: attendedAt }),
     });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setActionError(j.error ?? "오류가 발생했습니다.");
+      return;
+    }
     setAddMakeup(null);
     fetchStudents();
   }
@@ -430,7 +447,7 @@ function StudentsTab() {
             onEdit={() => openEdit(s)}
             onToggle={() => toggleActive(s)}
             onReset={() => resetSession(s)}
-            onMakeup={() => setAddMakeup(s)}
+            onMakeup={() => openMakeup(s)}
             onProxy={() => setConfirmProxy(s)}
             onNoShow={() => setConfirmNoShow(s)}
             onDouble={() => setConfirmDouble(s)}
@@ -451,7 +468,7 @@ function StudentsTab() {
                 onEdit={() => openEdit(s)}
                 onToggle={() => toggleActive(s)}
                 onReset={() => resetSession(s)}
-                onMakeup={() => setAddMakeup(s)}
+                onMakeup={() => openMakeup(s)}
                 onProxy={() => setConfirmProxy(s)}
                 onNoShow={() => setConfirmNoShow(s)}
                 onDouble={() => setConfirmDouble(s)}
@@ -587,10 +604,20 @@ function StudentsTab() {
       {addMakeup && (
         <Modal onClose={() => setAddMakeup(null)}>
           <h2 className="text-xl font-bold mb-3">보강 출석 추가</h2>
-          <p className="text-gray-600 mb-5">
-            <strong>{addMakeup.name}</strong>의 보강 출석을 오늘 날짜로 추가합니다.
-            회차가 1 증가합니다.
+          <p className="text-gray-600 mb-3">
+            <strong>{addMakeup.name}</strong>의 보강 출석을 추가합니다. 회차가 1 증가합니다.
           </p>
+          <div className="mb-5">
+            <label className="text-sm font-semibold text-gray-600 block mb-1">수업 날짜</label>
+            <input
+              type="date"
+              className={inputCls}
+              value={makeupDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setMakeupDate(e.target.value)}
+            />
+            <p className="text-xs text-gray-400 mt-1">까먹은 날짜를 선택하면 달력에 해당 날짜로 표시됩니다.</p>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() => setAddMakeup(null)}

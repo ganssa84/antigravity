@@ -148,7 +148,8 @@ export interface MarkResult {
 export async function markAttendance(
   studentId: string,
   isMakeup = false,
-  isNoShow = false
+  isNoShow = false,
+  attendedAt?: string  // ISO date string — 지정 시 해당 날짜로 기록, 중복 체크 우회
 ): Promise<MarkResult> {
   const client = getClient();
 
@@ -156,23 +157,26 @@ export async function markAttendance(
   if (!student) throw new Error("학생을 찾을 수 없습니다.");
   if (!student.is_active) throw new Error("비활성 학생입니다.");
 
-  if (!isMakeup && !isNoShow && (await isAlreadyAttendedToday(studentId))) {
+  if (!isMakeup && !isNoShow && !attendedAt && (await isAlreadyAttendedToday(studentId))) {
     throw new Error("오늘 이미 출석했습니다.");
   }
 
   const newSession = student.current_session + 1;
   const isLastSession = newSession >= student.sessions_per_cycle;
 
+  const insertData: Record<string, unknown> = {
+    student_id: studentId,
+    session_number: newSession,
+    cycle_number: student.current_cycle,
+    is_makeup: isMakeup,
+    is_noshow: isNoShow,
+    kakao_sent: false,
+  };
+  if (attendedAt) insertData.attended_at = attendedAt;
+
   const { data: attendance, error: attErr } = await client
     .from("bp_attendance")
-    .insert({
-      student_id: studentId,
-      session_number: newSession,
-      cycle_number: student.current_cycle,
-      is_makeup: isMakeup,
-      is_noshow: isNoShow,
-      kakao_sent: false,
-    })
+    .insert(insertData)
     .select()
     .single();
   if (attErr) throw attErr;

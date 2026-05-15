@@ -13,7 +13,7 @@ function isAdmin(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   try {
-    const { student_id, is_makeup = false, is_noshow = false, is_double = false } = await req.json();
+    const { student_id, is_makeup = false, is_noshow = false, is_double = false, attended_at } = await req.json();
 
     if (!student_id) {
       return NextResponse.json({ error: "student_id가 필요합니다." }, { status: 400 });
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 일반 출석 / 보강 / 결석 차감 ──
-    const result = await markAttendance(student_id, is_makeup, is_noshow);
+    const result = await markAttendance(student_id, is_makeup, is_noshow, attended_at);
     const { attendance, student, isLastSession, sessionNumber, totalSessions } = result;
 
     let text: string;
