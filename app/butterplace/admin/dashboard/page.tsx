@@ -247,10 +247,16 @@ function StudentsTab() {
   const [addMakeup, setAddMakeup] = useState<Student | null>(null);
 
   const fetchStudents = useCallback(async () => {
-    const res = await fetch("/api/butterplace/students?scope=all");
-    const json = await res.json();
-    setStudents(json.students ?? []);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const res  = await fetch("/api/butterplace/students?scope=all");
+      const json = await res.json().catch(() => ({}));
+      setStudents(json.students ?? []);
+    } catch {
+      // 에러나도 로딩 종료
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchStudents(); }, [fetchStudents]);
@@ -594,10 +600,15 @@ function AttendanceTab() {
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
-    const res  = await fetch(`/api/butterplace/attendance?year=${year}&month=${month}`);
-    const json = await res.json();
-    setRecords(json.records ?? []);
-    setLoading(false);
+    try {
+      const res  = await fetch(`/api/butterplace/attendance?year=${year}&month=${month}`);
+      const json = await res.json().catch(() => ({}));
+      setRecords(json.records ?? []);
+    } catch {
+      // 에러나도 로딩 종료
+    } finally {
+      setLoading(false);
+    }
   }, [year, month]);
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
