@@ -95,24 +95,27 @@ export async function sendBulkSMS(
 export function buildAttendanceMessage(
   name: string,
   sessionNumber: number,
-  totalSessions: number
+  totalSessions: number,
+  dateLabel = "오늘"
 ): string {
-  return `[버터플레이스] ${name}이(가) 오늘 ${sessionNumber}/${totalSessions}회차 수업에 출석했습니다. 감사합니다! 🎹`;
+  return `[버터플레이스] ${name}이(가) ${dateLabel} ${sessionNumber}/${totalSessions}회차 수업에 출석했습니다. 감사합니다! 🎹`;
 }
 
 export function buildLastSessionMessage(
   name: string,
-  totalSessions: number
+  totalSessions: number,
+  dateLabel = "오늘"
 ): string {
-  return `[버터플레이스] ${name}이(가) 오늘 ${totalSessions}/${totalSessions}회차 (마지막) 수업에 출석했습니다.\n다음 수업 시 수강료 결제를 부탁드립니다. 감사합니다! 🎹`;
+  return `[버터플레이스] ${name}이(가) ${dateLabel} ${totalSessions}/${totalSessions}회차 (마지막) 수업에 출석했습니다.\n다음 수업 시 수강료 결제를 부탁드립니다. 감사합니다! 🎹`;
 }
 
 export function buildNoShowMessage(
   name: string,
   sessionNumber: number,
-  totalSessions: number
+  totalSessions: number,
+  dateLabel = "오늘"
 ): string {
-  return `[버터플레이스] ${name} 학생이 오늘 예정된 수업에 불참하셨습니다. ${sessionNumber}/${totalSessions}회차가 차감되었습니다.`;
+  return `[버터플레이스] ${name} 학생이 ${dateLabel} 예정된 수업에 불참하셨습니다. ${sessionNumber}/${totalSessions}회차가 차감되었습니다.`;
 }
 
 export function buildDoubleSessionMessage(

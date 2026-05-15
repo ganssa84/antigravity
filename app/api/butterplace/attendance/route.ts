@@ -11,6 +11,16 @@ function isAdmin(req: NextRequest): boolean {
   return req.cookies.get("bp_admin")?.value === "authenticated";
 }
 
+function makeDateLabel(attendedAt?: string): string {
+  if (!attendedAt) return "오늘";
+  // UTC → KST(+9) 변환 후 "M월 D일(요일)" 형식으로 반환
+  const kst = new Date(new Date(attendedAt).getTime() + 9 * 60 * 60 * 1000);
+  const month = kst.getUTCMonth() + 1;
+  const day   = kst.getUTCDate();
+  const week  = ["일", "월", "화", "수", "목", "금", "토"][kst.getUTCDay()];
+  return `${month}월 ${day}일(${week})`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { student_id, is_makeup = false, is_noshow = false, is_double = false, attended_at } = await req.json();
@@ -31,6 +41,7 @@ export async function POST(req: NextRequest) {
       const text = isLastSession
         ? buildLastSessionMessage(student.name, totalSessions)
         : buildAttendanceMessage(student.name, sessionNumber, totalSessions);
+      // 당일1회추가는 항상 오늘 날짜이므로 dateLabel 불필요
 
       let smsSent = false;
       try {
@@ -62,13 +73,14 @@ export async function POST(req: NextRequest) {
     const result = await markAttendance(student_id, is_makeup, is_noshow, attended_at);
     const { attendance, student, isLastSession, sessionNumber, totalSessions } = result;
 
+    const dateLabel = makeDateLabel(attended_at);
     let text: string;
     if (is_noshow) {
-      text = buildNoShowMessage(student.name, sessionNumber, totalSessions);
+      text = buildNoShowMessage(student.name, sessionNumber, totalSessions, dateLabel);
     } else if (isLastSession) {
-      text = buildLastSessionMessage(student.name, totalSessions);
+      text = buildLastSessionMessage(student.name, totalSessions, dateLabel);
     } else {
-      text = buildAttendanceMessage(student.name, sessionNumber, totalSessions);
+      text = buildAttendanceMessage(student.name, sessionNumber, totalSessions, dateLabel);
     }
 
     let smsSent = false;
