@@ -817,61 +817,123 @@ function AttendanceTab() {
     else setMonth(month + 1);
   }
 
-  // 학생별 그룹
-  const byStudent = records.reduce<Record<string, AttendanceRecord[]>>((acc, r) => {
-    const n = r.student?.name ?? r.student_id;
-    acc[n] = acc[n] ?? [];
-    acc[n].push(r);
+  // 날짜별 그룹 (로컬 타임존 기준)
+  const byDate = records.reduce<Record<string, AttendanceRecord[]>>((acc, r) => {
+    const d = new Date(r.attended_at);
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    acc[key] = acc[key] ?? [];
+    acc[key].push(r);
     return acc;
   }, {});
 
+  // 달력 그리드 생성
+  const firstDow   = new Date(year, month - 1, 1).getDay(); // 0=일
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const todayDate  = now.getFullYear() === year && now.getMonth() + 1 === month
+    ? now.getDate() : -1;
+
+  const cells: (number | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* 월 선택 */}
       <div className="flex items-center justify-between bg-white rounded-2xl p-3 shadow-sm">
         <button onClick={prevMonth} className="text-2xl px-2 text-gray-600">‹</button>
-        <span className="font-bold text-gray-700">{year}년 {month}월</span>
+        <span className="font-bold text-gray-700">{year}년 {month}월 · 총 {records.length}건</span>
         <button onClick={nextMonth} className="text-2xl px-2 text-gray-600">›</button>
       </div>
 
-      <div className="text-sm text-gray-500">총 {records.length}건</div>
+      {loading ? <Spinner /> : (
+        <div className="bg-white rounded-2xl shadow-sm p-3">
+          {/* 요일 헤더 */}
+          <div className="grid grid-cols-7 mb-1">
+            {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
+              <div
+                key={d}
+                className={`text-center text-xs font-semibold py-1 ${
+                  i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-gray-400"
+                }`}
+              >
+                {d}
+              </div>
+            ))}
+          </div>
 
-      {loading ? (
-        <Spinner />
-      ) : records.length === 0 ? (
-        <EmptyMsg msg="출석 기록이 없습니다" />
-      ) : (
-        Object.entries(byStudent)
-          .sort(([a], [b]) => a.localeCompare(b, "ko"))
-          .map(([name, recs]) => (
-            <Section key={name} title={`${name} (${recs.length}회)`}>
-              <ul className="divide-y divide-gray-100">
-                {recs.map((r) => {
-                  const d = new Date(r.attended_at);
-                  const dateStr = d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", weekday: "short" });
-                  const timeStr = d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-                  return (
-                    <li key={r.id} className="py-2 flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span>{dateStr} {timeStr}</span>
-                        {r.is_makeup && !r.is_noshow && (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-1.5 rounded">보강</span>
-                        )}
-                        {r.is_noshow && (
-                          <span className="text-xs bg-orange-100 text-orange-600 px-1.5 rounded">결석차감</span>
-                        )}
-                      </div>
-                      <div className="text-gray-500">
-                        {r.session_number}/{r.student?.sessions_per_cycle}회차
-                        {r.kakao_sent && <span className="ml-1 text-green-500">✓발송</span>}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Section>
-          ))
+          {/* 날짜 칸 */}
+          <div className="grid grid-cols-7 gap-0.5">
+            {cells.map((day, idx) => {
+              if (!day) return <div key={idx} className="min-h-14" />;
+
+              const key        = `${year}-${month}-${day}`;
+              const dayRecords = byDate[key] ?? [];
+              const isToday    = day === todayDate;
+              const col        = idx % 7;
+
+              return (
+                <div
+                  key={idx}
+                  className={`min-h-14 rounded-lg p-1 ${
+                    isToday
+                      ? "bg-amber-50 ring-1 ring-amber-300"
+                      : dayRecords.length > 0
+                      ? "bg-gray-50"
+                      : ""
+                  }`}
+                >
+                  {/* 날짜 숫자 */}
+                  <div
+                    className={`text-xs font-bold mb-0.5 ${
+                      isToday
+                        ? "text-amber-600"
+                        : col === 0
+                        ? "text-red-400"
+                        : col === 6
+                        ? "text-blue-400"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {day}
+                  </div>
+
+                  {/* 출석 배지 */}
+                  {dayRecords.map((r) => (
+                    <div
+                      key={r.id}
+                      className={`text-[10px] leading-snug rounded px-0.5 py-0.5 mb-0.5 truncate ${
+                        r.is_noshow
+                          ? "bg-orange-100 text-orange-700"
+                          : r.is_makeup
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-green-100 text-green-700"
+                      }`}
+                      title={`${r.student?.name} ${r.session_number}/${r.student?.sessions_per_cycle}회차`}
+                    >
+                      {r.student?.name} {r.session_number}/{r.student?.sessions_per_cycle}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
+
+      {/* 범례 */}
+      <div className="flex gap-3 text-xs text-gray-500 flex-wrap px-1">
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-green-100 inline-block" />정상출석
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-blue-100 inline-block" />보강/추가
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 rounded bg-orange-100 inline-block" />결석차감
+        </span>
+      </div>
     </div>
   );
 }
