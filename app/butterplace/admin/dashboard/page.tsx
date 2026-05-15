@@ -26,6 +26,7 @@ interface AttendanceRecord {
   session_number: number;
   cycle_number: number;
   is_makeup: boolean;
+  is_noshow: boolean;
   kakao_sent: boolean;
   student: Student;
 }
@@ -258,6 +259,8 @@ function StudentsTab() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
   const [addMakeup, setAddMakeup] = useState<Student | null>(null);
+  const [confirmNoShow, setConfirmNoShow] = useState<Student | null>(null);
+  const [confirmDouble, setConfirmDouble] = useState<Student | null>(null);
 
   const fetchStudents = useCallback(async () => {
     setLoading(true);
@@ -354,6 +357,26 @@ function StudentsTab() {
     fetchStudents();
   }
 
+  async function handleNoShow(s: Student) {
+    await fetch("/api/butterplace/attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ student_id: s.id, is_noshow: true }),
+    });
+    setConfirmNoShow(null);
+    fetchStudents();
+  }
+
+  async function handleDouble(s: Student) {
+    await fetch("/api/butterplace/attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ student_id: s.id, is_double: true }),
+    });
+    setConfirmDouble(null);
+    fetchStudents();
+  }
+
   if (loading) return <Spinner />;
 
   const active   = students.filter((s) => s.is_active);
@@ -381,6 +404,8 @@ function StudentsTab() {
             onToggle={() => toggleActive(s)}
             onReset={() => resetSession(s)}
             onMakeup={() => setAddMakeup(s)}
+            onNoShow={() => setConfirmNoShow(s)}
+            onDouble={() => setConfirmDouble(s)}
             onDelete={() => setConfirmDelete(s)}
           />
         ))}
@@ -399,6 +424,8 @@ function StudentsTab() {
                 onToggle={() => toggleActive(s)}
                 onReset={() => resetSession(s)}
                 onMakeup={() => setAddMakeup(s)}
+                onNoShow={() => setConfirmNoShow(s)}
+                onDouble={() => setConfirmDouble(s)}
                 onDelete={() => setConfirmDelete(s)}
               />
             ))}
@@ -551,6 +578,65 @@ function StudentsTab() {
           </div>
         </Modal>
       )}
+
+      {/* 결석 차감 확인 모달 */}
+      {confirmNoShow && (
+        <Modal onClose={() => setConfirmNoShow(null)}>
+          <h2 className="text-xl font-bold mb-3 text-orange-600">결석 차감</h2>
+          <p className="text-gray-600 mb-2">
+            <strong>{confirmNoShow.name}</strong> 학생이 오늘 수업에 불참한 것으로 처리합니다.
+          </p>
+          <div className="bg-orange-50 rounded-xl p-3 mb-5 text-sm text-orange-700 space-y-1">
+            <p>• 현재 {confirmNoShow.current_session}/{confirmNoShow.sessions_per_cycle}회차 →
+              {" "}{confirmNoShow.current_session + 1}/{confirmNoShow.sessions_per_cycle}회차 차감</p>
+            <p>• 부모님 핸드폰으로 불참 알림이 자동 발송됩니다</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirmNoShow(null)}
+              className="flex-1 border border-gray-300 rounded-xl py-2 text-gray-600"
+            >
+              취소
+            </button>
+            <button
+              onClick={() => handleNoShow(confirmNoShow)}
+              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl py-2"
+            >
+              차감 처리
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* 당일 2회 확인 모달 */}
+      {confirmDouble && (
+        <Modal onClose={() => setConfirmDouble(null)}>
+          <h2 className="text-xl font-bold mb-3 text-purple-600">당일 2회 연속 수업</h2>
+          <p className="text-gray-600 mb-2">
+            <strong>{confirmDouble.name}</strong> 학생의 오늘 수업을 2회 연속으로 처리합니다.
+          </p>
+          <div className="bg-purple-50 rounded-xl p-3 mb-5 text-sm text-purple-700 space-y-1">
+            <p>• 현재 {confirmDouble.current_session}/{confirmDouble.sessions_per_cycle}회차 →
+              {" "}2회차 연속 처리</p>
+            <p>• 부모님께 연속 수업 완료 알림 1건 발송</p>
+            <p className="text-xs text-purple-500">※ 오늘 이미 키오스크에서 출석했다면 사용하지 마세요</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirmDouble(null)}
+              className="flex-1 border border-gray-300 rounded-xl py-2 text-gray-600"
+            >
+              취소
+            </button>
+            <button
+              onClick={() => handleDouble(confirmDouble)}
+              className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl py-2"
+            >
+              2회 처리
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -561,6 +647,8 @@ function StudentCard({
   onToggle,
   onReset,
   onMakeup,
+  onNoShow,
+  onDouble,
   onDelete,
 }: {
   student: Student;
@@ -568,6 +656,8 @@ function StudentCard({
   onToggle: () => void;
   onReset: () => void;
   onMakeup: () => void;
+  onNoShow: () => void;
+  onDouble: () => void;
   onDelete: () => void;
 }) {
   const progress = student.current_session / student.sessions_per_cycle;
@@ -609,6 +699,8 @@ function StudentCard({
       <div className="flex gap-2 flex-wrap">
         <ActionBtn onClick={onEdit} label="수정" />
         <ActionBtn onClick={onMakeup} label="보강" color="blue" />
+        <ActionBtn onClick={onNoShow} label="결석차감" color="orange" />
+        <ActionBtn onClick={onDouble} label="당일2회" color="purple" />
         <ActionBtn onClick={onReset} label="회차초기화" color="gray" />
         <ActionBtn onClick={onToggle} label={student.is_active ? "비활성" : "활성화"} color="gray" />
         <ActionBtn onClick={onDelete} label="삭제" color="red" />
@@ -688,8 +780,11 @@ function AttendanceTab() {
                     <li key={r.id} className="py-2 flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <span>{dateStr} {timeStr}</span>
-                        {r.is_makeup && (
+                        {r.is_makeup && !r.is_noshow && (
                           <span className="text-xs bg-blue-100 text-blue-600 px-1.5 rounded">보강</span>
+                        )}
+                        {r.is_noshow && (
+                          <span className="text-xs bg-orange-100 text-orange-600 px-1.5 rounded">결석차감</span>
                         )}
                       </div>
                       <div className="text-gray-500">
@@ -992,13 +1087,15 @@ function ActionBtn({
 }: {
   onClick: () => void;
   label: string;
-  color?: "amber" | "blue" | "red" | "gray";
+  color?: "amber" | "blue" | "red" | "gray" | "orange" | "purple";
 }) {
   const colors = {
-    amber: "bg-amber-100 text-amber-700 hover:bg-amber-200",
-    blue:  "bg-blue-100 text-blue-700 hover:bg-blue-200",
-    red:   "bg-red-100 text-red-700 hover:bg-red-200",
-    gray:  "bg-gray-100 text-gray-600 hover:bg-gray-200",
+    amber:  "bg-amber-100 text-amber-700 hover:bg-amber-200",
+    blue:   "bg-blue-100 text-blue-700 hover:bg-blue-200",
+    red:    "bg-red-100 text-red-700 hover:bg-red-200",
+    gray:   "bg-gray-100 text-gray-600 hover:bg-gray-200",
+    orange: "bg-orange-100 text-orange-700 hover:bg-orange-200",
+    purple: "bg-purple-100 text-purple-700 hover:bg-purple-200",
   };
   return (
     <button

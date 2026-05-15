@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { markAttendance, updateKakaoSent, getAllAttendanceByMonth, logMessage } from "@/lib/butterplace-db";
-import { sendSMS, buildAttendanceMessage, buildLastSessionMessage } from "@/lib/solapi";
+import {
+  sendSMS,
+  buildAttendanceMessage,
+  buildLastSessionMessage,
+  buildNoShowMessage,
+  buildDoubleSessionMessage,
+} from "@/lib/solapi";
 
 function isAdmin(req: NextRequest): boolean {
   return req.cookies.get("bp_admin")?.value === "authenticated";
@@ -8,22 +14,69 @@ function isAdmin(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   try {
-    const { student_id, is_makeup = false } = await req.json();
+    const { student_id, is_makeup = false, is_noshow = false, is_double = false } = await req.json();
 
     if (!student_id) {
       return NextResponse.json({ error: "student_id가 필요합니다." }, { status: 400 });
     }
 
-    if (is_makeup && !isAdmin(req)) {
-      return NextResponse.json({ error: "보강 입력은 관리자만 가능합니다." }, { status: 401 });
+    if ((is_makeup || is_noshow || is_double) && !isAdmin(req)) {
+      return NextResponse.json({ error: "관리자만 가능합니다." }, { status: 401 });
     }
 
-    const result = await markAttendance(student_id, is_makeup);
+    // ── 당일 2회 연속 ──
+    if (is_double) {
+      const r1 = await markAttendance(student_id, false);
+      const r2 = await markAttendance(student_id, true);
+
+      const hasPayment = r1.isLastSession || r2.isLastSession;
+      const text = buildDoubleSessionMessage(
+        r1.student.name,
+        r1.sessionNumber,
+        r2.sessionNumber,
+        r2.totalSessions,
+        hasPayment
+      );
+
+      let smsSent = false;
+      try {
+        await sendSMS(r1.student.parent_phone, text);
+        await updateKakaoSent(r1.attendance.id);
+        await updateKakaoSent(r2.attendance.id);
+        smsSent = true;
+      } catch (e) {
+        console.error("[솔라피] 당일2회 발송 실패:", e);
+      }
+      await logMessage({
+        recipient: r1.student.name,
+        phone: r1.student.parent_phone,
+        message: text,
+        type: "attendance",
+        success: smsSent,
+      });
+
+      return NextResponse.json({
+        success: true,
+        studentName: r1.student.name,
+        session1: r1.sessionNumber,
+        session2: r2.sessionNumber,
+        totalSessions: r2.totalSessions,
+        message: text,
+      });
+    }
+
+    // ── 일반 출석 / 보강 / 결석 차감 ──
+    const result = await markAttendance(student_id, is_makeup, is_noshow);
     const { attendance, student, isLastSession, sessionNumber, totalSessions } = result;
 
-    const text = isLastSession
-      ? buildLastSessionMessage(student.name, totalSessions)
-      : buildAttendanceMessage(student.name, sessionNumber, totalSessions);
+    let text: string;
+    if (is_noshow) {
+      text = buildNoShowMessage(student.name, sessionNumber, totalSessions);
+    } else if (isLastSession) {
+      text = buildLastSessionMessage(student.name, totalSessions);
+    } else {
+      text = buildAttendanceMessage(student.name, sessionNumber, totalSessions);
+    }
 
     let smsSent = false;
     try {
@@ -47,6 +100,7 @@ export async function POST(req: NextRequest) {
       sessionNumber,
       totalSessions,
       isLastSession,
+      isNoShow: is_noshow,
       message: text,
     });
   } catch (e) {

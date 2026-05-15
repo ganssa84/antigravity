@@ -32,6 +32,7 @@ export interface Attendance {
   session_number: number;
   cycle_number: number;
   is_makeup: boolean;
+  is_noshow: boolean;
   kakao_sent: boolean;
   created_at: string;
 }
@@ -139,14 +140,18 @@ export interface MarkResult {
   totalSessions: number;
 }
 
-export async function markAttendance(studentId: string, isMakeup = false): Promise<MarkResult> {
+export async function markAttendance(
+  studentId: string,
+  isMakeup = false,
+  isNoShow = false
+): Promise<MarkResult> {
   const client = getClient();
 
   const student = await getStudentById(studentId);
   if (!student) throw new Error("학생을 찾을 수 없습니다.");
   if (!student.is_active) throw new Error("비활성 학생입니다.");
 
-  if (!isMakeup && (await isAlreadyAttendedToday(studentId))) {
+  if (!isMakeup && !isNoShow && (await isAlreadyAttendedToday(studentId))) {
     throw new Error("오늘 이미 출석했습니다.");
   }
 
@@ -160,6 +165,7 @@ export async function markAttendance(studentId: string, isMakeup = false): Promi
       session_number: newSession,
       cycle_number: student.current_cycle,
       is_makeup: isMakeup,
+      is_noshow: isNoShow,
       kakao_sent: false,
     })
     .select()
