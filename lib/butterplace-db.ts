@@ -76,11 +76,16 @@ export async function getStudentById(id: string): Promise<Student | null> {
 }
 
 export async function createStudent(
-  student: Pick<Student, "name" | "parent_phone" | "lessons_per_week" | "sessions_per_cycle" | "birth_date" | "note">
+  student: Pick<Student, "name" | "parent_phone" | "lessons_per_week" | "sessions_per_cycle" | "birth_date" | "note"> & { current_session?: number; current_cycle?: number }
 ): Promise<Student> {
   const { data, error } = await getClient()
     .from("bp_students")
-    .insert({ ...student, current_session: 0, current_cycle: 1, is_active: true })
+    .insert({
+      ...student,
+      current_session: student.current_session ?? 0,
+      current_cycle: student.current_cycle ?? 1,
+      is_active: true,
+    })
     .select()
     .single();
   if (error) throw error;

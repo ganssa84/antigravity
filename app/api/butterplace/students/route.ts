@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, parent_phone, lessons_per_week, sessions_per_cycle, birth_date, note } = body;
+    const { name, parent_phone, lessons_per_week, sessions_per_cycle, current_session, current_cycle, birth_date, note } = body;
 
     if (!name || !parent_phone) {
       return NextResponse.json({ error: "이름과 학부모 번호는 필수입니다." }, { status: 400 });
@@ -53,6 +53,8 @@ export async function POST(req: NextRequest) {
       parent_phone,
       lessons_per_week: lessons_per_week ?? 1,
       sessions_per_cycle: sessions_per_cycle ?? (lessons_per_week === 2 ? 8 : 4),
+      current_session: current_session ?? 0,
+      current_cycle: current_cycle ?? 1,
       birth_date: birth_date ?? null,
       note: note ?? null,
     });
