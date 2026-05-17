@@ -30,6 +30,10 @@ const BUTTON_COLORS = [
   "bg-lime-300 hover:bg-lime-400 border-lime-500",
 ];
 
+const COLOR_OVERRIDES: Record<string, string> = {
+  "이유진": "bg-emerald-400 hover:bg-emerald-500 border-emerald-600",
+};
+
 export default function KioskPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +183,7 @@ export default function KioskPage() {
         ) : (
           <div className="grid grid-cols-2 gap-4">
             {students.map((student, i) => {
-              const colorClass = BUTTON_COLORS[i % BUTTON_COLORS.length];
+              const colorClass = COLOR_OVERRIDES[student.name] ?? BUTTON_COLORS[i % BUTTON_COLORS.length];
               const isAttending = attending === student.id;
               const done = student.attendedToday;
 
@@ -202,11 +206,7 @@ export default function KioskPage() {
                   )}
                   <div className="text-3xl mb-1">{done ? "😊" : "🎵"}</div>
                   <div className="leading-tight">{student.name}</div>
-                  {!done && (
-                    <div className="text-sm font-normal text-gray-600 mt-1">
-                      {student.current_session}/{student.sessions_per_cycle}회차
-                    </div>
-                  )}
+
                   {done && (
                     <div className="text-sm font-normal text-gray-500 mt-1">
                       출석 완료!
