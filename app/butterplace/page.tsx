@@ -71,12 +71,51 @@ export default function KioskPage() {
     fetchStudents();
   }, [fetchStudents]);
 
+  function playWelcomeSound() {
+    try {
+      const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      // C5 E5 G5 C6 — 밝은 장조 아르페지오
+      const freqs = [523.25, 659.25, 783.99, 1046.50];
+      freqs.forEach((freq, i) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "triangle";
+        osc.frequency.value = freq;
+        const t = ctx.currentTime + i * 0.13;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.35, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+        osc.start(t);
+        osc.stop(t + 0.9);
+      });
+    } catch {
+      // Web Audio 미지원 환경에서는 무시
+    }
+  }
+
   async function handleAttend(student: Student) {
     if (student.attendedToday || attending) return;
 
     setAttending(student.id);
     setError(null);
 
+    // 즉시 성공 화면 표시 (낙관적 업데이트)
+    const sessionNumber = student.current_session + 1;
+    const totalSessions = student.sessions_per_cycle;
+    const isLastSession = sessionNumber >= totalSessions;
+
+    setSuccess({ name: student.name, sessionNumber, totalSessions, isLastSession });
+    setStudents((prev) =>
+      prev.map((s) => s.id === student.id ? { ...s, attendedToday: true } : s)
+    );
+    playWelcomeSound();
+    setTimeout(() => setSuccess(null), 3500);
+
+    // 백그라운드에서 API 처리
     try {
       const res = await fetch("/api/butterplace/attendance", {
         method: "POST",
@@ -86,28 +125,19 @@ export default function KioskPage() {
       const json = await res.json();
 
       if (!res.ok) {
+        // 실패 시 롤백
+        setSuccess(null);
+        setStudents((prev) =>
+          prev.map((s) => s.id === student.id ? { ...s, attendedToday: false } : s)
+        );
         setError(json.error ?? "출석 처리 중 오류가 발생했습니다.");
         setTimeout(() => setError(null), 3000);
-        return;
       }
-
-      setSuccess({
-        name: json.studentName,
-        sessionNumber: json.sessionNumber,
-        totalSessions: json.totalSessions,
-        isLastSession: json.isLastSession,
-      });
-
-      // 학생 목록 갱신
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.id === student.id ? { ...s, attendedToday: true } : s
-        )
-      );
-
-      // 3.5초 후 성공 화면 닫기
-      setTimeout(() => setSuccess(null), 3500);
     } catch {
+      setSuccess(null);
+      setStudents((prev) =>
+        prev.map((s) => s.id === student.id ? { ...s, attendedToday: false } : s)
+      );
       setError("네트워크 오류가 발생했습니다.");
       setTimeout(() => setError(null), 3000);
     } finally {
