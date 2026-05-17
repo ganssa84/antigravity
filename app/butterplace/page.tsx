@@ -38,6 +38,7 @@ export default function KioskPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [attending, setAttending] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<Student | null>(null);
   const [success, setSuccess] = useState<SuccessInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
@@ -76,7 +77,6 @@ export default function KioskPage() {
       const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
-      // C5 E5 G5 C6 — 밝은 장조 아르페지오
       const freqs = [523.25, 659.25, 783.99, 1046.50];
       freqs.forEach((freq, i) => {
         const osc  = ctx.createOscillator();
@@ -97,13 +97,18 @@ export default function KioskPage() {
     }
   }
 
-  async function handleAttend(student: Student) {
+  function handleTap(student: Student) {
     if (student.attendedToday || attending) return;
+    setConfirm(student);
+  }
 
+  async function handleConfirm() {
+    if (!confirm) return;
+    const student = confirm;
+    setConfirm(null);
     setAttending(student.id);
     setError(null);
 
-    // 즉시 성공 화면 표시 (낙관적 업데이트)
     const sessionNumber = student.current_session + 1;
     const totalSessions = student.sessions_per_cycle;
     const isLastSession = sessionNumber >= totalSessions;
@@ -115,7 +120,6 @@ export default function KioskPage() {
     playWelcomeSound();
     setTimeout(() => setSuccess(null), 3500);
 
-    // 백그라운드에서 API 처리
     try {
       const res = await fetch("/api/butterplace/attendance", {
         method: "POST",
@@ -125,7 +129,6 @@ export default function KioskPage() {
       const json = await res.json();
 
       if (!res.ok) {
-        // 실패 시 롤백
         setSuccess(null);
         setStudents((prev) =>
           prev.map((s) => s.id === student.id ? { ...s, attendedToday: false } : s)
@@ -180,6 +183,33 @@ export default function KioskPage() {
         </div>
       )}
 
+      {/* 확인 팝업 */}
+      {confirm && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl px-10 py-10 flex flex-col items-center mx-6 w-full max-w-sm">
+            <div className="text-6xl mb-4">🎵</div>
+            <div className="text-4xl font-black text-gray-800 mb-2 text-center">
+              {confirm.name}
+            </div>
+            <div className="text-xl text-gray-500 mb-8">맞나요?</div>
+            <div className="flex gap-4 w-full">
+              <button
+                onClick={() => setConfirm(null)}
+                className="flex-1 py-4 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl font-bold transition-all active:scale-95"
+              >
+                아니에요 ❌
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="flex-1 py-4 rounded-2xl bg-green-400 hover:bg-green-500 text-white text-xl font-bold transition-all active:scale-95"
+              >
+                맞아요 ✅
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 헤더 */}
       <header className="pt-8 pb-4 px-6 text-center">
         <div className="text-5xl mb-1">🎵</div>
@@ -214,21 +244,19 @@ export default function KioskPage() {
           <div className="grid grid-cols-2 gap-4">
             {students.map((student, i) => {
               const colorClass = COLOR_OVERRIDES[student.name] ?? BUTTON_COLORS[i % BUTTON_COLORS.length];
-              const isAttending = attending === student.id;
               const done = student.attendedToday;
 
               return (
                 <button
                   key={student.id}
-                  onClick={() => handleAttend(student)}
-                  disabled={done || isAttending || !!attending}
+                  onClick={() => handleTap(student)}
+                  disabled={done || !!attending}
                   className={`
                     relative rounded-3xl border-4 py-8 px-4
                     text-2xl font-black text-gray-800
                     transition-all duration-150 active:scale-95
                     ${colorClass}
                     ${done ? "opacity-50 cursor-not-allowed" : "cursor-pointer shadow-lg"}
-                    ${isAttending ? "animate-pulse" : ""}
                   `}
                 >
                   {done && (
@@ -236,7 +264,6 @@ export default function KioskPage() {
                   )}
                   <div className="text-3xl mb-1">{done ? "😊" : "🎵"}</div>
                   <div className="leading-tight">{student.name}</div>
-
                   {done && (
                     <div className="text-sm font-normal text-gray-500 mt-1">
                       출석 완료!
