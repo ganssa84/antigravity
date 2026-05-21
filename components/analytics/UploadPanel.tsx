@@ -26,8 +26,9 @@ const BRN_MERGE: Record<string, string> = {
 };
 
 function normalizeBrn(brn: string, year: number): string | null {
-  // 7878601037: ≤2025 → 네이버, ≥2026 → exclude
+  // 네오스엠 네이버 BRN 전환: 7878601037 (≤2025 네이버), 2208162517 (≥2026 네이버)
   if (brn === "7878601037") return year <= 2025 ? "2208162517" : null;
+  if (brn === "2208162517") return year >= 2026 ? "2208162517" : null;
   return BRN_MERGE[brn] ?? brn;
 }
 
@@ -65,9 +66,6 @@ function processRows(rows: unknown[][]): ReturnType<typeof buildPayload> {
     const month = Number(raw[COL.month]);
     const amount = Number(raw[COL.amount]);
     if (!year || !month || isNaN(amount)) continue;
-
-    // Exclude incomplete months: only show data up to 2026-03
-    if (year === 2026 && month > 3) continue;
 
     const rawBrn = String(raw[COL.brn] ?? "");
     const resolvedBrn = normalizeBrn(rawBrn, year);

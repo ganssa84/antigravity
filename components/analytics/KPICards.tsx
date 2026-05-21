@@ -77,7 +77,7 @@ const ALL_CARDS: CardConfig[] = [
   },
   {
     key: "q1_current",
-    label: "2026년 1분기 매출",
+    label: "올해 YTD 매출",
     format: (v) => formatKRW(v) + " 원",
     bg: "bg-indigo-50", border: "border-indigo-100", iconColor: "text-indigo-600",
     icon: (
@@ -88,7 +88,7 @@ const ALL_CARDS: CardConfig[] = [
   },
   {
     key: "q1_prev",
-    label: "2025년 1분기 매출",
+    label: "전년 동기 매출",
     format: (v) => formatKRW(v) + " 원",
     bg: "bg-sky-50", border: "border-sky-100", iconColor: "text-sky-600",
     icon: (
@@ -148,12 +148,22 @@ export default function KPICards({
   kpi,
   visibleKeys = ["total_amount", "total_qty", "num_partners", "num_products"],
   growthRate,
+  ytdMaxMonth,
+  ytdTargetYear,
 }: {
   kpi: KPI | null;
   visibleKeys?: CardKey[];
   growthRate?: number | null;
+  ytdMaxMonth?: number;
+  ytdTargetYear?: number;
 }) {
-  const cards = ALL_CARDS.filter((c) => visibleKeys.includes(c.key));
+  const cards = ALL_CARDS.filter((c) => visibleKeys.includes(c.key)).map((c) => {
+    if (c.key === "q1_current" && ytdMaxMonth && ytdTargetYear)
+      return { ...c, label: `${ytdTargetYear}년 1~${ytdMaxMonth}월 매출` };
+    if (c.key === "q1_prev" && ytdMaxMonth && ytdTargetYear)
+      return { ...c, label: `${ytdTargetYear - 1}년 1~${ytdMaxMonth}월 매출` };
+    return c;
+  });
   return (
     <div className={`grid gap-4 ${cards.length === 1 ? "grid-cols-1 max-w-xs" : cards.length === 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4"}`}>
       {cards.map((card) => {

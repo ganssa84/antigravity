@@ -134,9 +134,14 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       }
       const teams = Array.from(teamMap.values()).sort((a, b) => b.amount - a.amount);
 
-      // Q1 2026 vs Q1 2025 (marketplace-specific)
-      const brnQ1Current = Math.round(brnAllData.filter(r => r.year === 2026 && r.month <= 3).reduce((s, r) => s + r.amount, 0));
-      const brnQ1Prev = Math.round(brnAllData.filter(r => r.year === 2025 && r.month <= 3).reduce((s, r) => s + r.amount, 0));
+      // Dynamic YTD: detect latest partial year from BRN monthly data
+      const brnLatestYear = Math.max(0, ...Object.keys(monthlyByYearAll).map(Number));
+      const brnLatestMonths = (monthlyByYearAll[brnLatestYear] ?? []).map(m => m.month);
+      const brnYtdMaxMonth = brnLatestMonths.length > 0 && brnLatestMonths.length < 12 ? Math.max(...brnLatestMonths) : 3;
+
+      // YTD current year vs same-period prior year (marketplace-specific)
+      const brnQ1Current = Math.round(brnAllData.filter(r => r.year === brnLatestYear && r.month <= brnYtdMaxMonth).reduce((s, r) => s + r.amount, 0));
+      const brnQ1Prev = Math.round(brnAllData.filter(r => r.year === brnLatestYear - 1 && r.month <= brnYtdMaxMonth).reduce((s, r) => s + r.amount, 0));
       const brnYoyRate: number | undefined = brnQ1Prev > 0 ? (brnQ1Current - brnQ1Prev) / brnQ1Prev * 100 : undefined;
 
       // CAGR 2023~2025 (marketplace-specific)
@@ -209,7 +214,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       const partnerYoyMonths: number[] | null = (tgtMonthsBrn.length > 0 && tgtMonthsBrn.length < 12) ? tgtMonthsBrn : null;
       const partnerProdMonthly = rawData.partnerProductsMonthly.filter(r => r.brn === selectedBrn);
 
-      return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn: [] as ProductBrnItem[], partners: [] as { partner_name: string; amount: number; qty: number; num_products: number }[], teams, brnTotals: [] as { brn: string; amount: number; qty: number }[], kpi, partnerBrn: pbFilt, partnerProducts: ppFilt, growthRate, mpTrendData: [] as Record<string, number | string>[], partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear, partnerYoyTargetYear, partnerYoyPrevYear, partnerYoyMonths, partnerProdMonthly, teamBrnMonthly: [] as { brn: string; year: number; month: number; amount: number }[], teamPartnerProducts: [] as { brn: string; material: string; material_id: string; year: number; amount: number }[] };
+      return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn: [] as ProductBrnItem[], partners: [] as { partner_name: string; amount: number; qty: number; num_products: number }[], teams, brnTotals: [] as { brn: string; amount: number; qty: number }[], kpi, partnerBrn: pbFilt, partnerProducts: ppFilt, growthRate, mpTrendData: [] as Record<string, number | string>[], partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear, partnerYoyTargetYear, partnerYoyPrevYear, partnerYoyMonths, partnerProdMonthly, teamBrnMonthly: [] as { brn: string; year: number; month: number; amount: number }[], teamPartnerProducts: [] as { brn: string; material: string; material_id: string; year: number; amount: number }[], ytdMaxMonth: brnYtdMaxMonth, ytdTargetYear: brnLatestYear };
     }
 
     // ── Overview / Team view ───────────────────────────────────────────────
@@ -302,10 +307,15 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     const totalAmount = monthlyFiltered.reduce((s, r) => s + r.amount, 0);
     const totalQty = monthlyFiltered.reduce((s, r) => s + r.qty, 0);
 
-    // Q1 2026 vs Q1 2025
+    // Dynamic YTD: detect latest partial year
     const allTeamMonthly = byTeam(rawData.monthly);
-    const q1Current = Math.round(allTeamMonthly.filter(r => r.year === 2026 && r.month <= 3).reduce((s, r) => s + r.amount, 0));
-    const q1Prev = Math.round(allTeamMonthly.filter(r => r.year === 2025 && r.month <= 3).reduce((s, r) => s + r.amount, 0));
+    const ytdLatestYear = Math.max(0, ...Object.keys(monthlyByYearAll).map(Number));
+    const ytdLatestMonths = (monthlyByYearAll[ytdLatestYear] ?? []).map(m => m.month);
+    const ytdMaxMonth = ytdLatestMonths.length > 0 && ytdLatestMonths.length < 12 ? Math.max(...ytdLatestMonths) : 3;
+
+    // YTD current year vs same-period prior year
+    const q1Current = Math.round(allTeamMonthly.filter(r => r.year === ytdLatestYear && r.month <= ytdMaxMonth).reduce((s, r) => s + r.amount, 0));
+    const q1Prev = Math.round(allTeamMonthly.filter(r => r.year === ytdLatestYear - 1 && r.month <= ytdMaxMonth).reduce((s, r) => s + r.amount, 0));
     const yoyRate: number | undefined = q1Prev > 0 ? (q1Current - q1Prev) / q1Prev * 100 : undefined;
 
     // CAGR 2023~2025 (full years only)
@@ -411,7 +421,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     const partnerYoyMonths: number[] | null = (tgtMonthsTeam.length > 0 && tgtMonthsTeam.length < 12) ? tgtMonthsTeam : null;
     const partnerProdMonthly = byTeam(rawData.partnerProductsMonthly);
 
-    return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts, growthRate, mpTrendData, partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear, partnerYoyTargetYear, partnerYoyPrevYear, partnerYoyMonths, partnerProdMonthly, teamBrnMonthly, teamPartnerProducts };
+    return { monthlyByYear, monthlyByYearAll, yearly, products, productBrn, partners, teams, brnTotals, kpi, partnerBrn, partnerProducts, growthRate, mpTrendData, partnersAll, topGrowing, topDeclining, growthTargetYear, growthPrevYear, partnerYoyTargetYear, partnerYoyPrevYear, partnerYoyMonths, partnerProdMonthly, teamBrnMonthly, teamPartnerProducts, ytdMaxMonth, ytdTargetYear: ytdLatestYear };
   }, [rawData, selectedTeam, selectedYear, isMarketplace, selectedBrn]);
 
   const commodityMonthlyByTeam = useMemo(() => {
@@ -622,6 +632,8 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
                   kpi={chartData.kpi}
                   visibleKeys={["q1_current", "q1_prev", "yoy_rate", "cagr"]}
                   growthRate={null}
+                  ytdMaxMonth={chartData.ytdMaxMonth}
+                  ytdTargetYear={chartData.ytdTargetYear}
                 />
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
