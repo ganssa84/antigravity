@@ -26,9 +26,9 @@ const BRN_MERGE: Record<string, string> = {
 };
 
 function normalizeBrn(brn: string, year: number): string | null {
-  // 네오스엠 네이버 BRN 전환: 7878601037 (≤2025 네이버), 2208162517 (≥2026 네이버)
+  // 네오스엠 구 BRN: ≤2025 → 네이버(2208162517)로 합산, ≥2026 → 제외
   if (brn === "7878601037") return year <= 2025 ? "2208162517" : null;
-  if (brn === "2208162517") return year >= 2026 ? "2208162517" : null;
+  // 2208162517은 전체 파트너 공통 네이버 BRN — 연도 무관 포함
   return BRN_MERGE[brn] ?? brn;
 }
 
