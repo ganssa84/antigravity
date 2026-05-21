@@ -109,7 +109,8 @@ export default function KioskPage() {
     setAttending(student.id);
     setError(null);
 
-    const sessionNumber = student.current_session + 1;
+    const baseSession   = student.current_session >= student.sessions_per_cycle ? 0 : student.current_session;
+    const sessionNumber = baseSession + 1;
     const totalSessions = student.sessions_per_cycle;
     const isLastSession = sessionNumber >= totalSessions;
 

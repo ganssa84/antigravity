@@ -166,13 +166,18 @@ export async function markAttendance(
     throw new Error("오늘 이미 출석했습니다.");
   }
 
-  const newSession = student.current_session + 1;
+  // current_session이 sessions_per_cycle 이상이면 사이클이 완료된 상태 — 새 사이클 1회차로 처리
+  const cycleOverflow = student.current_session >= student.sessions_per_cycle;
+  const baseSession   = cycleOverflow ? 0 : student.current_session;
+  const baseCycle     = cycleOverflow ? student.current_cycle + 1 : student.current_cycle;
+
+  const newSession    = baseSession + 1;
   const isLastSession = newSession >= student.sessions_per_cycle;
 
   const insertData: Record<string, unknown> = {
     student_id: studentId,
     session_number: newSession,
-    cycle_number: student.current_cycle,
+    cycle_number: baseCycle,
     is_makeup: isMakeup,
     is_noshow: isNoShow,
     kakao_sent: false,
@@ -189,7 +194,7 @@ export async function markAttendance(
   // 마지막 회차면 사이클 리셋, 아니면 회차 증가
   const updatedStudent = await updateStudent(studentId, {
     current_session: isLastSession ? 0 : newSession,
-    current_cycle: isLastSession ? student.current_cycle + 1 : student.current_cycle,
+    current_cycle:   isLastSession ? baseCycle + 1 : baseCycle,
   });
 
   return {
