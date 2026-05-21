@@ -20,6 +20,8 @@ import TeamMarketplaceChart from "./TeamMarketplaceChart";
 
 const TEAMS = ["AAD", "ASD", "ISD", "EMD", "PSD", "IATD"] as const;
 const MARKETPLACE_BRNS = ["2208162517", "1208800767", "1198666372", "2208183676", "8158101244"] as const;
+// 임시 숨김 — 재노출 시 아래 배열 비우기
+const HIDDEN_BRNS = new Set(["1198666372"]);
 
 const TEAM_COLORS: Record<string, string> = {
   AAD: "#fb923c", ASD: "#f87171", ISD: "#a78bfa",
@@ -302,7 +304,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
       if (ex) { ex.amount += r.amount; ex.qty += r.qty; }
       else brnMap.set(r.brn, { brn: r.brn, amount: r.amount, qty: r.qty });
     }
-    const brnTotals = Array.from(brnMap.values()).sort((a, b) => b.amount - a.amount);
+    const brnTotals = Array.from(brnMap.values()).sort((a, b) => b.amount - a.amount).filter(r => !HIDDEN_BRNS.has(r.brn));
 
     const totalAmount = monthlyFiltered.reduce((s, r) => s + r.amount, 0);
     const totalQty = monthlyFiltered.reduce((s, r) => s + r.qty, 0);
@@ -362,9 +364,10 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
     const mpTrendData = Object.entries(mpTrendMap)
       .sort((a, b) => Number(a[0]) - Number(b[0]))
       .map(([yr, brnMap]) => {
-        const total = Object.values(brnMap).reduce((s, v) => s + v, 0);
+        const visibleBrns = MARKETPLACE_BRNS.filter(b => !HIDDEN_BRNS.has(b));
+        const total = visibleBrns.reduce((s, b) => s + (brnMap[b] || 0), 0);
         const row: Record<string, number | string> = { year: Number(yr) };
-        for (const brn of MARKETPLACE_BRNS) {
+        for (const brn of visibleBrns) {
           row[MARKETPLACE_NAMES[brn]] = total > 0 ? Math.round((brnMap[brn] || 0) / total * 1000) / 10 : 0;
         }
         return row;
@@ -492,7 +495,7 @@ export default function DashboardClient({ initialTab = "overview" }: { initialTa
           <div className="pt-4 pb-1.5 px-3">
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Marketplaces</p>
           </div>
-          {MARKETPLACE_BRNS.map((brn) => (
+          {MARKETPLACE_BRNS.filter(brn => !HIDDEN_BRNS.has(brn)).map((brn) => (
             <button
               key={brn}
               onClick={() => setActiveTab(`brn_${brn}`)}
