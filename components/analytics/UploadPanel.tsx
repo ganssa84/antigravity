@@ -67,6 +67,9 @@ function processRows(rows: unknown[][]): ReturnType<typeof buildPayload> {
     const amount = Number(raw[COL.amount]);
     if (!year || !month || isNaN(amount)) continue;
 
+    // Show data up to 2026-04 only (May onwards excluded until full month data is available)
+    if (year === 2026 && month > 4) continue;
+
     const rawBrn = String(raw[COL.brn] ?? "");
     const resolvedBrn = normalizeBrn(rawBrn, year);
     if (resolvedBrn === null) continue;
