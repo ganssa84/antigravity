@@ -20,8 +20,7 @@ import TeamMarketplaceChart from "./TeamMarketplaceChart";
 
 const TEAMS = ["AAD", "ASD", "ISD", "EMD", "PSD", "IATD"] as const;
 const MARKETPLACE_BRNS = ["2208162517", "1208800767", "1198666372", "2208183676", "8158101244"] as const;
-// 임시 숨김 — 재노출 시 아래 배열 비우기
-const HIDDEN_BRNS = new Set(["1198666372"]);
+const HIDDEN_BRNS = new Set<string>();
 
 const TEAM_COLORS: Record<string, string> = {
   AAD: "#fb923c", ASD: "#f87171", ISD: "#a78bfa",
