@@ -350,19 +350,41 @@ export default function AnalyticsPage() {
                   />
                   <Tooltip content={<CustomTooltip viewMode={viewMode} />} />
                   <Legend
-                    onClick={handleLegendClick}
-                    wrapperStyle={{ cursor: "pointer", fontSize: 12, paddingTop: 8 }}
-                    formatter={(value) => (
-                      <span
-                        style={{
-                          opacity: highlighted && highlighted !== value && value !== "합계" ? 0.3 : 1,
-                          fontWeight: highlighted === value ? 600 : 400,
-                          transition: "opacity 0.15s",
-                        }}
-                      >
-                        {value === "__total__" ? "합계" : value}
-                      </span>
-                    )}
+                    wrapperStyle={{ paddingTop: 8 }}
+                    content={(props: any) => {
+                      const items: any[] = props.payload ?? [];
+                      // 합계(Line)를 맨 뒤로 고정
+                      const bars = chartKeys
+                        .map((key) => items.find((p) => p.value === key))
+                        .filter(Boolean);
+                      const total = items.find((p) => p.value === "합계");
+                      const sorted = total ? [...bars, total] : bars;
+                      return (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px", justifyContent: "center", fontSize: 12, cursor: "pointer" }}>
+                          {sorted.map((entry) => (
+                            <span
+                              key={entry.value}
+                              onClick={() => handleLegendClick(entry)}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 4,
+                                opacity: highlighted && highlighted !== entry.value && entry.value !== "합계" ? 0.3 : 1,
+                                fontWeight: highlighted === entry.value ? 600 : 400,
+                                transition: "opacity 0.15s",
+                              }}
+                            >
+                              {entry.value === "합계" ? (
+                                <svg width="16" height="10" style={{ flexShrink: 0 }}>
+                                  <line x1="0" y1="5" x2="16" y2="5" stroke="#111827" strokeWidth="2" strokeDasharray="5 3" />
+                                </svg>
+                              ) : (
+                                <span style={{ width: 10, height: 10, background: entry.color, borderRadius: 2, flexShrink: 0, display: "inline-block" }} />
+                              )}
+                              {entry.value}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    }}
                   />
                   {chartKeys.map((key, i) => (
                     <Bar
