@@ -32,17 +32,31 @@ const PERIOD_LABELS: Record<Period, string> = {
   daily: "일별", weekly: "주별", monthly: "월별", yearly: "년도별",
 };
 
-function computeDateRange(period: Period): { fromDate: string; toDate: string } {
-  const to = new Date();
-  const from = new Date();
-  if (period === "daily") from.setDate(from.getDate() - 29);
-  else if (period === "weekly") from.setDate(from.getDate() - 90);
-  else if (period === "monthly") from.setMonth(from.getMonth() - 11);
-  else from.setFullYear(from.getFullYear() - 4);
+const BUSINESS_START = "2025-12-01";
+
+function computeDateRange(): { fromDate: string; toDate: string } {
   return {
-    fromDate: from.toISOString().split("T")[0],
-    toDate: to.toISOString().split("T")[0],
+    fromDate: BUSINESS_START,
+    toDate: new Date().toISOString().split("T")[0],
   };
+}
+
+// 범위 내 모든 기간 키를 생성 (데이터 없는 기간도 0으로 채우기 위해)
+function getAllPeriodKeys(fromDate: string, toDate: string, period: Period): string[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  let cursor = new Date(fromDate + "T00:00:00");
+  const end = new Date(toDate + "T00:00:00");
+
+  while (cursor <= end) {
+    const key = getPeriodKey(cursor.toISOString().split("T")[0], period);
+    if (!seen.has(key)) { seen.add(key); keys.push(key); }
+    if (period === "daily") cursor.setDate(cursor.getDate() + 1);
+    else if (period === "weekly") cursor.setDate(cursor.getDate() + 7);
+    else if (period === "monthly") cursor.setMonth(cursor.getMonth() + 1);
+    else cursor.setFullYear(cursor.getFullYear() + 1);
+  }
+  return keys;
 }
 
 function getPeriodKey(date: string, period: Period): string {
@@ -108,7 +122,7 @@ export default function AnalyticsPage() {
   const [raw, setRaw] = useState<SaleRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { fromDate, toDate } = useMemo(() => computeDateRange(period), [period]);
+  const { fromDate, toDate } = useMemo(() => computeDateRange(), []);
 
   useEffect(() => {
     setLoading(true);
@@ -140,9 +154,13 @@ export default function AnalyticsPage() {
   const hasOthers = Object.keys(productTotalsByRevenue).length > MAX_CHART_PRODUCTS;
   const chartKeys = hasOthers ? [...topProducts, "기타"] : topProducts;
 
-  // 차트 데이터 빌드
+  // 차트 데이터 빌드 (데이터 없는 기간도 0으로 채움)
   const chartData = useMemo(() => {
+    // 전체 기간의 키 목록 생성
+    const allKeys = getAllPeriodKeys(fromDate, toDate, period);
     const byPeriod: Record<string, Record<string, number>> = {};
+    for (const key of allKeys) byPeriod[key] = {};
+
     for (const row of raw) {
       const key = getPeriodKey(row.sale_date, period);
       if (!byPeriod[key]) byPeriod[key] = {};
@@ -154,14 +172,15 @@ export default function AnalyticsPage() {
           : row.quantity;
       byPeriod[key][productKey] = (byPeriod[key][productKey] ?? 0) + Math.max(0, val);
     }
-    return Object.entries(byPeriod)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, vals]) => ({
+    return allKeys.map((key) => {
+      const vals = byPeriod[key];
+      return {
         label: formatLabel(key, period),
         ...vals,
         __total__: Object.values(vals).reduce((s, v) => s + v, 0),
-      }));
-  }, [raw, period, viewMode, topSet]);
+      };
+    });
+  }, [raw, period, viewMode, topSet, fromDate, toDate]);
 
   // 요약 통계
   const totalActualRevenue = useMemo(
@@ -212,8 +231,11 @@ export default function AnalyticsPage() {
     setHighlighted((prev) => (prev === key ? null : key));
   };
 
+  // 일별은 데이터 포인트가 많으므로 적절한 레이블 간격 설정
   const xAxisInterval =
-    period === "daily" ? Math.floor(chartData.length / 8) || 0 : "preserveStartEnd";
+    period === "daily"
+      ? Math.max(Math.floor(chartData.length / 10), 6)
+      : "preserveStartEnd";
 
   return (
     <div className="space-y-6">
