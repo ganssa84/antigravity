@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { getSalesByDateRange } from "@/lib/heartain-db";
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
+  ResponsiveContainer, Legend, LabelList,
 } from "recharts";
 
 type Period = "daily" | "weekly" | "monthly" | "yearly";
@@ -24,9 +24,11 @@ interface SaleRow {
 
 const COLORS = [
   "#2563eb", "#16a34a", "#dc2626", "#d97706", "#7c3aed",
-  "#0891b2", "#be185d", "#65a30d", "#6b7280",
+  "#0891b2", "#be185d", "#65a30d", "#0f766e", "#c2410c",
+  "#7e22ce", "#b45309", "#0284c7", "#047857", "#991b1b",
+  "#92400e", "#1e40af", "#4d7c0f", "#831843", "#134e4a",
+  "#1e3a5f", "#713f12", "#064e3b", "#500724", "#1c1917",
 ];
-const MAX_CHART_PRODUCTS = 8;
 
 const PERIOD_LABELS: Record<Period, string> = {
   daily: "일별", weekly: "주별", monthly: "월별", yearly: "년도별",
@@ -34,20 +36,11 @@ const PERIOD_LABELS: Record<Period, string> = {
 
 const BUSINESS_START = "2025-12-01";
 
-function computeDateRange(): { fromDate: string; toDate: string } {
-  return {
-    fromDate: BUSINESS_START,
-    toDate: new Date().toISOString().split("T")[0],
-  };
-}
-
-// 범위 내 모든 기간 키를 생성 (데이터 없는 기간도 0으로 채우기 위해)
 function getAllPeriodKeys(fromDate: string, toDate: string, period: Period): string[] {
   const keys: string[] = [];
   const seen = new Set<string>();
   let cursor = new Date(fromDate + "T00:00:00");
   const end = new Date(toDate + "T00:00:00");
-
   while (cursor <= end) {
     const key = getPeriodKey(cursor.toISOString().split("T")[0], period);
     if (!seen.has(key)) { seen.add(key); keys.push(key); }
@@ -63,9 +56,8 @@ function getPeriodKey(date: string, period: Period): string {
   if (period === "daily") return date;
   if (period === "yearly") return date.slice(0, 4);
   if (period === "monthly") return date.slice(0, 7);
-  // weekly: 해당 주의 월요일
   const d = new Date(date + "T00:00:00");
-  const dow = d.getDay(); // 0=Sun
+  const dow = d.getDay();
   const diff = dow === 0 ? -6 : 1 - dow;
   d.setDate(d.getDate() + diff);
   return d.toISOString().split("T")[0];
@@ -85,10 +77,19 @@ function fmtAmt(n: number): string {
   return `${Math.round(n).toLocaleString()}원`;
 }
 
+function fmtBarLabel(v: number, viewMode: ViewMode): string {
+  if (v <= 0) return "";
+  if (viewMode === "quantity") return `${Math.round(v)}`;
+  if (v >= 1000) return `${Math.round(v / 1000)}K`;
+  return `${Math.round(v)}`;
+}
+
 const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
   if (!active || !payload?.length) return null;
   const total = payload.find((p: any) => p.dataKey === "__total__");
-  const items = payload.filter((p: any) => p.dataKey !== "__total__" && p.value > 0);
+  const items = payload
+    .filter((p: any) => p.dataKey !== "__total__" && (p.value ?? 0) > 0)
+    .sort((a: any, b: any) => b.value - a.value);
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs max-w-xs">
       <p className="font-semibold text-gray-700 mb-2">{label}</p>
@@ -103,7 +104,7 @@ const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
           </span>
         </div>
       ))}
-      {total && (
+      {total && items.length > 1 && (
         <div className="flex justify-between gap-4 mt-1.5 pt-1.5 border-t border-gray-100">
           <span className="font-semibold text-gray-700">합계</span>
           <span className="font-bold text-gray-900">
@@ -116,13 +117,14 @@ const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
 };
 
 export default function AnalyticsPage() {
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
   const [period, setPeriod] = useState<Period>("monthly");
   const [viewMode, setViewMode] = useState<ViewMode>("amount");
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [raw, setRaw] = useState<SaleRow[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const { fromDate, toDate } = useMemo(() => computeDateRange(), []);
+  const [fromDate, setFromDate] = useState(BUSINESS_START);
+  const [toDate, setToDate] = useState(today);
 
   useEffect(() => {
     setLoading(true);
@@ -132,31 +134,18 @@ export default function AnalyticsPage() {
       .finally(() => setLoading(false));
   }, [fromDate, toDate]);
 
-  // 제품별 합계 (차트 상위 제품 선정용)
-  const productTotalsByRevenue = useMemo(() => {
+  // 모든 제품을 매출 기준으로 정렬
+  const chartKeys = useMemo(() => {
     const totals: Record<string, number> = {};
     for (const row of raw) {
       const name = row.product?.name ?? "기타";
       totals[name] = (totals[name] ?? 0) + row.quantity * (row.product?.selling_price ?? 0);
     }
-    return totals;
+    return Object.entries(totals).sort(([, a], [, b]) => b - a).map(([name]) => name);
   }, [raw]);
 
-  const topProducts = useMemo(
-    () =>
-      Object.entries(productTotalsByRevenue)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, MAX_CHART_PRODUCTS)
-        .map(([name]) => name),
-    [productTotalsByRevenue]
-  );
-  const topSet = useMemo(() => new Set(topProducts), [topProducts]);
-  const hasOthers = Object.keys(productTotalsByRevenue).length > MAX_CHART_PRODUCTS;
-  const chartKeys = hasOthers ? [...topProducts, "기타"] : topProducts;
-
-  // 차트 데이터 빌드 (데이터 없는 기간도 0으로 채움)
+  // 기간별 차트 데이터 (빈 기간 포함)
   const chartData = useMemo(() => {
-    // 전체 기간의 키 목록 생성
     const allKeys = getAllPeriodKeys(fromDate, toDate, period);
     const byPeriod: Record<string, Record<string, number>> = {};
     for (const key of allKeys) byPeriod[key] = {};
@@ -165,77 +154,70 @@ export default function AnalyticsPage() {
       const key = getPeriodKey(row.sale_date, period);
       if (!byPeriod[key]) byPeriod[key] = {};
       const name = row.product?.name ?? "기타";
-      const productKey = topSet.has(name) ? name : "기타";
       const val =
         viewMode === "amount"
           ? row.quantity * (row.product?.selling_price ?? 0) - (row.coupon_discount ?? 0)
           : row.quantity;
-      byPeriod[key][productKey] = (byPeriod[key][productKey] ?? 0) + Math.max(0, val);
+      byPeriod[key][name] = (byPeriod[key][name] ?? 0) + Math.max(0, val);
     }
+
     return allKeys.map((key) => {
       const vals = byPeriod[key];
-      return {
-        label: formatLabel(key, period),
-        ...vals,
-        __total__: Object.values(vals).reduce((s, v) => s + v, 0),
-      };
+      const total = Object.values(vals).reduce((s, v) => s + v, 0);
+      return { label: formatLabel(key, period), ...vals, __total__: total };
     });
-  }, [raw, period, viewMode, topSet, fromDate, toDate]);
+  }, [raw, period, viewMode, fromDate, toDate]);
+
+  // 하이라이트 시: 해당 제품만 남기고 나머지 0으로 → 항상 0 기준에서 시작
+  const displayData = useMemo(() => {
+    if (!highlighted) return chartData;
+    return chartData.map((row) => {
+      const val = (row as any)[highlighted] ?? 0;
+      const result: Record<string, any> = { label: row.label, __total__: val };
+      for (const key of chartKeys) result[key] = key === highlighted ? val : 0;
+      return result;
+    });
+  }, [chartData, highlighted, chartKeys]);
 
   // 요약 통계
   const totalActualRevenue = useMemo(
     () => raw.reduce((s, r) => s + r.quantity * (r.product?.selling_price ?? 0) - (r.coupon_discount ?? 0), 0),
     [raw]
   );
-  const totalCoupon = useMemo(
-    () => raw.reduce((s, r) => s + (r.coupon_discount ?? 0), 0),
-    [raw]
-  );
-  const totalCost = useMemo(
-    () => raw.reduce((s, r) => s + r.quantity * (r.product?.cost_krw ?? 0), 0),
-    [raw]
-  );
+  const totalCoupon = useMemo(() => raw.reduce((s, r) => s + (r.coupon_discount ?? 0), 0), [raw]);
+  const totalCost = useMemo(() => raw.reduce((s, r) => s + r.quantity * (r.product?.cost_krw ?? 0), 0), [raw]);
   const totalProfit = useMemo(
     () => raw.reduce((s, r) => s + r.quantity * (r.product?.margin ?? 0) - (r.coupon_discount ?? 0), 0),
     [raw]
   );
   const totalUnits = useMemo(() => raw.reduce((s, r) => s + r.quantity, 0), [raw]);
 
-  // 제품별 상세 통계 (테이블용)
+  // 제품별 상세 통계
   const productStats = useMemo(() => {
-    const stats: Record<
-      string,
-      { name: string; units: number; revenue: number; coupon: number; cost: number; profit: number }
-    > = {};
+    const stats: Record<string, { name: string; units: number; revenue: number; coupon: number; cost: number; profit: number }> = {};
     for (const row of raw) {
       const name = row.product?.name ?? "기타";
-      if (!stats[name])
-        stats[name] = { name, units: 0, revenue: 0, coupon: 0, cost: 0, profit: 0 };
-      const revenue = row.quantity * (row.product?.selling_price ?? 0) - (row.coupon_discount ?? 0);
+      if (!stats[name]) stats[name] = { name, units: 0, revenue: 0, coupon: 0, cost: 0, profit: 0 };
       stats[name].units += row.quantity;
-      stats[name].revenue += revenue;
+      stats[name].revenue += row.quantity * (row.product?.selling_price ?? 0) - (row.coupon_discount ?? 0);
       stats[name].coupon += row.coupon_discount ?? 0;
       stats[name].cost += row.quantity * (row.product?.cost_krw ?? 0);
-      stats[name].profit +=
-        row.quantity * (row.product?.margin ?? 0) - (row.coupon_discount ?? 0);
+      stats[name].profit += row.quantity * (row.product?.margin ?? 0) - (row.coupon_discount ?? 0);
     }
     return Object.values(stats).sort((a, b) => b.revenue - a.revenue);
   }, [raw]);
 
   const handleLegendClick = (data: any) => {
     const key = data.dataKey ?? data.value;
-    if (key === "__total__") {
-      setHighlighted(null);
-      return;
-    }
+    if (key === "__total__" || key === "합계") { setHighlighted(null); return; }
     setHighlighted((prev) => (prev === key ? null : key));
   };
 
-  // 일별은 데이터 포인트가 많으므로 적절한 레이블 간격 설정
   const xAxisInterval =
-    period === "daily"
-      ? Math.max(Math.floor(chartData.length / 10), 6)
-      : "preserveStartEnd";
+    period === "daily" ? Math.max(Math.floor(chartData.length / 10), 6) : "preserveStartEnd";
+
+  // 막대 수가 적을 때만 레이블 표시
+  const showLabels = chartData.length <= 24;
 
   return (
     <div className="space-y-6">
@@ -243,6 +225,37 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-gray-900">매출 분석</h1>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* 날짜 직접 선택 */}
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm shadow-sm">
+            <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <input
+              type="date"
+              value={fromDate}
+              min={BUSINESS_START}
+              max={toDate}
+              onChange={(e) => { if (e.target.value) setFromDate(e.target.value); }}
+              className="text-gray-700 outline-none cursor-pointer bg-transparent"
+            />
+            <span className="text-gray-300">–</span>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate}
+              max={today}
+              onChange={(e) => { if (e.target.value) setToDate(e.target.value); }}
+              className="text-gray-700 outline-none cursor-pointer bg-transparent"
+            />
+            {(fromDate !== BUSINESS_START || toDate !== today) && (
+              <button
+                onClick={() => { setFromDate(BUSINESS_START); setToDate(today); }}
+                className="text-xs text-blue-500 hover:text-blue-700 shrink-0"
+              >
+                초기화
+              </button>
+            )}
+          </div>
           {/* 금액/판매량 토글 */}
           <div className="flex gap-0.5 bg-gray-100 rounded-lg p-1">
             {(["amount", "quantity"] as ViewMode[]).map((m) => (
@@ -264,9 +277,7 @@ export default function AnalyticsPage() {
                 key={p}
                 onClick={() => setPeriod(p)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  period === p
-                    ? "bg-gray-900 text-white"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                  period === p ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
                 {PERIOD_LABELS[p]}
@@ -310,20 +321,20 @@ export default function AnalyticsPage() {
             <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               <div className="flex items-baseline justify-between mb-1">
                 <h2 className="text-sm font-semibold text-gray-600">
-                  {viewMode === "amount" ? "실제 매출 추이" : "판매량 추이"} — 제품별
+                  {viewMode === "amount" ? "실제 매출 추이" : "판매량 추이"}
+                  {highlighted ? ` — ${highlighted}` : " — 제품별"}
                 </h2>
                 {highlighted && (
-                  <button
-                    onClick={() => setHighlighted(null)}
-                    className="text-xs text-blue-600 hover:text-blue-800"
-                  >
+                  <button onClick={() => setHighlighted(null)} className="text-xs text-blue-600 hover:text-blue-800">
                     전체 보기
                   </button>
                 )}
               </div>
-              <p className="text-xs text-gray-400 mb-4">범례 항목 클릭 → 해당 제품 하이라이트</p>
-              <ResponsiveContainer width="100%" height={320}>
-                <ComposedChart data={chartData} margin={{ left: 10, right: 10 }}>
+              <p className="text-xs text-gray-400 mb-4">
+                {highlighted ? "범례 다른 항목 클릭 → 전환 · 같은 항목 클릭 → 전체" : "범례 항목 클릭 → 0 기준 단독 비교"}
+              </p>
+              <ResponsiveContainer width="100%" height={340}>
+                <ComposedChart data={displayData} margin={{ left: 10, right: 10, top: 28 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="label"
@@ -344,7 +355,8 @@ export default function AnalyticsPage() {
                     formatter={(value) => (
                       <span
                         style={{
-                          opacity: highlighted && highlighted !== value ? 0.35 : 1,
+                          opacity: highlighted && highlighted !== value && value !== "합계" ? 0.3 : 1,
+                          fontWeight: highlighted === value ? 600 : 400,
                           transition: "opacity 0.15s",
                         }}
                       >
@@ -359,9 +371,24 @@ export default function AnalyticsPage() {
                       name={key}
                       stackId="stack"
                       fill={COLORS[i % COLORS.length]}
-                      opacity={highlighted && highlighted !== key ? 0.15 : 1}
-                      radius={i === chartKeys.length - 1 ? [3, 3, 0, 0] : undefined}
-                    />
+                      radius={
+                        highlighted === key
+                          ? [3, 3, 0, 0]
+                          : !highlighted && i === chartKeys.length - 1
+                          ? [3, 3, 0, 0]
+                          : undefined
+                      }
+                    >
+                      {/* 마지막 bar에 합계 레이블 표시 */}
+                      {showLabels && i === chartKeys.length - 1 && (
+                        <LabelList
+                          dataKey="__total__"
+                          position="top"
+                          formatter={(v: any) => fmtBarLabel(Number(v), viewMode)}
+                          style={{ fontSize: 11, fill: "#374151", fontWeight: 600 }}
+                        />
+                      )}
+                    </Bar>
                   ))}
                   <Line
                     type="monotone"
@@ -371,7 +398,7 @@ export default function AnalyticsPage() {
                     strokeWidth={2}
                     dot={false}
                     strokeDasharray="5 3"
-                    opacity={highlighted ? 0.3 : 0.8}
+                    opacity={highlighted ? 0.4 : 0.7}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -411,25 +438,17 @@ export default function AnalyticsPage() {
                       <td className="px-4 py-3 text-right text-gray-400">
                         {p.cost > 0 ? `${p.cost.toLocaleString()}원` : "-"}
                       </td>
-                      <td
-                        className={`px-4 py-3 text-right font-semibold ${
-                          p.profit >= 0 ? "text-green-600" : "text-red-600"
-                        }`}
-                      >
+                      <td className={`px-4 py-3 text-right font-semibold ${p.profit >= 0 ? "text-green-600" : "text-red-600"}`}>
                         {p.profit.toLocaleString()}원
                       </td>
                       <td className="px-4 py-3 text-right text-gray-400">
-                        {totalActualRevenue > 0
-                          ? `${Math.round((p.revenue / totalActualRevenue) * 100)}%`
-                          : "-"}
+                        {totalActualRevenue > 0 ? `${Math.round((p.revenue / totalActualRevenue) * 100)}%` : "-"}
                       </td>
                     </tr>
                   ))}
                   {productStats.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-gray-400">
-                        판매 데이터가 없습니다
-                      </td>
+                      <td colSpan={7} className="text-center py-8 text-gray-400">판매 데이터가 없습니다</td>
                     </tr>
                   )}
                   {productStats.length > 0 && (
