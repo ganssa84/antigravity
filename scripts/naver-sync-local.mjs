@@ -184,6 +184,34 @@ for (const order of allOrders) {
   invMap[pid] = curQty - qty;
   syncCount++;
   console.log(`  ✅ ${order.productName.slice(0, 30)} x${qty} → product_id ${pid}`);
+
+  // 키링 추가 옵션이면 키체인(23)도 별도 판매 기록
+  const hasKeyring = order.productOption.includes('키링 추가');
+  const krId = `${order.productOrderId}_kr`;
+  if (hasKeyring && !processed.has(krId)) {
+    const krQty = qty;
+    const krCur = invMap[23] ?? 0;
+    const { ok: krOk } = await sbFetch('/rest/v1/heartain_sales', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        product_id: 23, quantity: krQty,
+        sale_date: order.orderDate || new Date().toISOString().slice(0, 10),
+        note: `키링 추가 옵션 (네이버 주문 #${order.orderId})`,
+        naver_order_id: krId,
+        coupon_discount: 0,
+      }),
+    });
+    if (krOk) {
+      await sbFetch(`/rest/v1/heartain_inventory?product_id=eq.23`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ quantity: Math.max(0, krCur - krQty), updated_at: new Date().toISOString() }),
+      });
+      invMap[23] = Math.max(0, krCur - krQty);
+      console.log(`     └─ 키링 추가 x${krQty} → product_id 23`);
+    }
+  }
 }
 
 // 동기화 로그 기록
