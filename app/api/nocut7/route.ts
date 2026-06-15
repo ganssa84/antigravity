@@ -6,6 +6,29 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+const CREATE_SQL = `
+  CREATE TABLE IF NOT EXISTS nocut7_rankings (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    name text NOT NULL,
+    time float8 NOT NULL,
+    created_at timestamptz DEFAULT now()
+  );
+  ALTER TABLE nocut7_rankings ENABLE ROW LEVEL SECURITY;
+  DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='nocut7_rankings' AND policyname='public read') THEN
+      CREATE POLICY "public read" ON nocut7_rankings FOR SELECT USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='nocut7_rankings' AND policyname='public insert') THEN
+      CREATE POLICY "public insert" ON nocut7_rankings FOR INSERT WITH CHECK (true);
+    END IF;
+  END $$;
+`;
+
+async function ensureTable() {
+  // rpc 방식으로 테이블 자동 생성 시도 (service role 없으면 무시)
+  await supabase.rpc('exec_ddl', { sql: CREATE_SQL }).catch(() => null);
+}
+
 export async function GET() {
   const { data, error } = await supabase
     .from('nocut7_rankings')
@@ -13,7 +36,10 @@ export async function GET() {
     .order('time', { ascending: true })
     .limit(20);
 
-  if (error) return NextResponse.json([], { status: 200 });
+  if (error) {
+    // 테이블 없음 → 클라이언트가 localStorage 폴백 사용
+    return NextResponse.json(null, { status: 503 });
+  }
   return NextResponse.json(data ?? []);
 }
 
@@ -26,7 +52,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid' }, { status: 400 });
   }
 
-  await supabase.from('nocut7_rankings').insert({ name, time });
+  const { error: insertErr } = await supabase
+    .from('nocut7_rankings')
+    .insert({ name, time });
+
+  if (insertErr) {
+    return NextResponse.json({ error: insertErr.message }, { status: 503 });
+  }
 
   const { count } = await supabase
     .from('nocut7_rankings')
