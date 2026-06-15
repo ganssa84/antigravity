@@ -6,29 +6,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const CREATE_SQL = `
-  CREATE TABLE IF NOT EXISTS nocut7_rankings (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    name text NOT NULL,
-    time float8 NOT NULL,
-    created_at timestamptz DEFAULT now()
-  );
-  ALTER TABLE nocut7_rankings ENABLE ROW LEVEL SECURITY;
-  DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='nocut7_rankings' AND policyname='public read') THEN
-      CREATE POLICY "public read" ON nocut7_rankings FOR SELECT USING (true);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='nocut7_rankings' AND policyname='public insert') THEN
-      CREATE POLICY "public insert" ON nocut7_rankings FOR INSERT WITH CHECK (true);
-    END IF;
-  END $$;
-`;
-
-async function ensureTable() {
-  // rpc 방식으로 테이블 자동 생성 시도 (service role 없으면 무시)
-  await supabase.rpc('exec_ddl', { sql: CREATE_SQL }).catch(() => null);
-}
-
 export async function GET() {
   const { data, error } = await supabase
     .from('nocut7_rankings')
@@ -37,8 +14,7 @@ export async function GET() {
     .limit(20);
 
   if (error) {
-    // 테이블 없음 → 클라이언트가 localStorage 폴백 사용
-    return NextResponse.json(null, { status: 503 });
+    return NextResponse.json({ _error: 'db_unavailable' }, { status: 503 });
   }
   return NextResponse.json(data ?? []);
 }
@@ -60,16 +36,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: insertErr.message }, { status: 503 });
   }
 
-  const { count } = await supabase
-    .from('nocut7_rankings')
-    .select('*', { count: 'exact', head: true })
-    .lt('time', time);
+  const [{ count: faster }, { count: total }] = await Promise.all([
+    supabase.from('nocut7_rankings').select('*', { count: 'exact', head: true }).lt('time', time),
+    supabase.from('nocut7_rankings').select('*', { count: 'exact', head: true }),
+  ]);
 
-  const { count: total } = await supabase
-    .from('nocut7_rankings')
-    .select('*', { count: 'exact', head: true });
-
-  const rank = (count ?? 0) + 1;
-
-  return NextResponse.json({ rank, total: total ?? 0 });
+  return NextResponse.json({ rank: (faster ?? 0) + 1, total: total ?? 0 });
 }
