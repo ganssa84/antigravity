@@ -524,6 +524,7 @@ html,body{
         autocomplete="off" autocorrect="off"
         autocapitalize="off" spellcheck="false"
         oninput="onGameInput()"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();if(!document.getElementById('submit-btn').disabled)submitGame();}"
       ></textarea>
     </div>
   </div>
@@ -716,7 +717,8 @@ function stopTimer() {
 /* ── Game input handler ── */
 function onGameInput() {
   const inp = document.getElementById('game-input');
-  const val = inp.value;
+  const val = inp.value.replace(/\n/g, '');
+  if (inp.value !== val) inp.value = val;
 
   if (!started && val.length > 0) startTimer();
 
