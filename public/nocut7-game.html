@@ -143,15 +143,15 @@ html,body{
   border-radius:12px;
   padding:16px;
 }
-.notice-card-icon{font-size:22px;margin-bottom:8px}
+.notice-card-icon{font-size:36px;margin-bottom:10px}
 .notice-card-title{
-  font-size:12px;font-weight:700;
+  font-size:24px;font-weight:700;
   color:#f59e0b;
-  letter-spacing:1px;text-transform:uppercase;
-  margin-bottom:8px;
+  letter-spacing:0.5px;
+  margin-bottom:10px;
 }
 .notice-card-body{
-  font-size:13px;line-height:1.75;color:#ddd;
+  font-size:22px;line-height:1.75;color:#ddd;
 }
 .notice-card-body strong{color:white;font-weight:700}
 
@@ -561,38 +561,38 @@ html,body{
 <script>
 const TARGET = "한국3M에서 출시된 슈퍼그립 노컷7 장갑은 텅스텐원사로 만들어진 베임방지 장갑으로 기존 제품에 비하여 베임방지 성능이 탁월하다.";
 const MAX_RANK = 20;
-const KEY = 'nocut7_v1';
 
 let player = '';
 let timerRaf = null;
 let startTime = null;
 let finalTime = null;
 let started = false;
+let pollTimer = null;
 
-/* ── localStorage helpers ── */
-function load() {
-  try { return JSON.parse(localStorage.getItem(KEY)) || []; }
-  catch { return []; }
-}
-function save(data) {
-  localStorage.setItem(KEY, JSON.stringify(data));
+/* ── API ── */
+async function fetchRankings() {
+  try {
+    const res = await fetch('/api/nocut7');
+    if (res.ok) return await res.json();
+  } catch {}
+  return [];
 }
 
-/* ── Add & rank ── */
-function addEntry(name, time) {
-  const list = load();
-  const entry = { name, time };
-  list.push(entry);
-  list.sort((a, b) => a.time - b.time);
-  const rank = list.indexOf(entry) + 1;
-  if (list.length > MAX_RANK) list.splice(MAX_RANK);
-  save(list);
-  return rank;
+async function postEntry(name, time) {
+  try {
+    const res = await fetch('/api/nocut7', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, time })
+    });
+    if (res.ok) return await res.json();
+  } catch {}
+  return { rank: 21, total: 0 };
 }
 
 /* ── Render ranking table ── */
-function renderRanking() {
-  const list = load();
+async function renderRanking() {
+  const list = await fetchRankings();
   const tbody = document.getElementById('ranking-body');
   const count = document.getElementById('total-count');
 
@@ -621,6 +621,17 @@ function esc(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+/* ── Polling: 5초마다 랭킹 갱신 ── */
+function startPolling() {
+  stopPolling();
+  renderRanking();
+  pollTimer = setInterval(renderRanking, 5000);
+}
+
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
 /* ── Screen navigation ── */
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -630,11 +641,12 @@ function show(id) {
 function goToMain() {
   stopTimer();
   resetGameState();
-  renderRanking();
+  startPolling();
   show('screen-main');
 }
 
 function goToReady() {
+  stopPolling();
   show('screen-ready');
 }
 
@@ -738,7 +750,7 @@ function renderTarget(input) {
   let html = '';
   for (let i = 0; i < TARGET.length; i++) {
     const raw = TARGET[i];
-    const ch  = raw === ' ' ? ' ' : esc(raw);
+    const ch  = raw === ' ' ? ' ' : esc(raw);
     if (i < input.length) {
       html += input[i] === raw
         ? `<span class="c-correct">${ch}</span>`
@@ -753,7 +765,7 @@ function renderTarget(input) {
 }
 
 /* ── Submit ── */
-function submitGame() {
+async function submitGame() {
   const inp = document.getElementById('game-input');
   if (inp.value !== TARGET) return;
 
@@ -761,10 +773,8 @@ function submitGame() {
   inp.disabled = true;
   document.getElementById('submit-btn').disabled = true;
 
-  const rank = addEntry(player, finalTime);
-  const total = load().length;
+  const { rank, total } = await postEntry(player, finalTime);
 
-  /* result screen */
   document.getElementById('result-time-num').textContent = finalTime.toFixed(2);
 
   const rankEl = document.getElementById('result-rank-num');
@@ -798,7 +808,7 @@ function submitGame() {
 }
 
 /* ── Boot ── */
-renderRanking();
+startPolling();
 renderTarget('');
 </script>
 </body>
