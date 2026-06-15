@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>슈퍼그립 노컷7 타자 챌린지</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+
+:root{
+  --red:#E4002B;
+  --red-dark:#b8001f;
+  --bg:#0c0c0c;
+  --card:#161616;
+  --card2:#1e1e1e;
+  --border:#2a2a2a;
+  --text:#f0f0f0;
+  --dim:#666;
+  --dim2:#999;
+  --green:#16a34a;
+  --green-light:#22c55e;
+  --gold:#f59e0b;
+  --silver:#94a3b8;
+  --bronze:#b45309;
+}
+
+html,body{
+  width:100%;height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Apple SD Gothic Neo','Noto Sans KR',-apple-system,sans-serif;
+  overflow:hidden;
+  font-size:16px;
+}
+
+/* ── SCREENS ── */
+.screen{
+  display:none;
+  width:100%;height:100dvh;
+  flex-direction:column;
+  align-items:stretch;
+  overflow:hidden;
+  position:absolute;top:0;left:0;
+}
+.screen.active{display:flex}
+
+/* ════════════════════════════════
+   SCREEN — MAIN / RANKING
+════════════════════════════════ */
+#screen-main{}
+
+.main-header{
+  background:var(--red);
+  padding:20px 20px 16px;
+  display:flex;align-items:center;gap:14px;
+  flex-shrink:0;
+}
+.logo-3m{
+  background:white;color:var(--red);
+  font-weight:900;font-size:20px;
+  padding:5px 9px;border-radius:5px;
+  letter-spacing:-0.5px;flex-shrink:0;
+}
+.header-titles h1{font-size:18px;font-weight:800;line-height:1.3;letter-spacing:-0.3px}
+.header-titles p{font-size:12px;opacity:.75;margin-top:2px;letter-spacing:0.5px}
+
+.main-body{
+  display:flex;flex:1;overflow:hidden;
+}
+
+/* Left — Ranking */
+.ranking-col{
+  flex:1;display:flex;flex-direction:column;
+  overflow:hidden;
+  border-right:1px solid var(--border);
+}
+.ranking-col-header{
+  padding:14px 16px 10px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.ranking-col-header h2{font-size:16px;font-weight:700}
+.live-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--red);
+  animation:blink 1.5s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+.ranking-scroll{flex:1;overflow-y:auto;padding:0 4px}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:2px}
+
+.ranking-table{width:100%;border-collapse:collapse}
+.ranking-table th{
+  position:sticky;top:0;
+  font-size:10px;color:var(--dim);font-weight:600;
+  padding:8px 10px;text-align:left;
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  letter-spacing:1.5px;text-transform:uppercase;
+}
+.ranking-table th:last-child{text-align:right}
+
+.ranking-table tr.data-row td{
+  padding:10px 10px;
+  border-bottom:1px solid #181818;
+  font-size:15px;vertical-align:middle;
+}
+.ranking-table tr.data-row:last-child td{border-bottom:none}
+
+.r-num{width:42px;font-weight:800;font-size:17px}
+.r-num.r1{color:var(--gold)}
+.r-num.r2{color:var(--silver)}
+.r-num.r3{color:var(--bronze)}
+.r-num.rn{color:var(--dim);font-size:14px;font-weight:600}
+.r-name{font-weight:600;font-size:15px}
+.r-time{
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+  font-weight:700;font-size:15px;
+  color:var(--green-light);
+}
+.r-empty{
+  padding:40px 16px;
+  text-align:center;
+  color:var(--dim);font-size:14px;line-height:1.8;
+}
+
+/* Right — Notice + Button */
+.notice-col{
+  width:248px;flex-shrink:0;
+  display:flex;flex-direction:column;
+  padding:16px;gap:14px;
+  overflow-y:auto;
+}
+.notice-card{
+  background:var(--card2);
+  border:1px solid #3a2800;
+  border-radius:12px;
+  padding:16px;
+}
+.notice-card-icon{font-size:22px;margin-bottom:8px}
+.notice-card-title{
+  font-size:12px;font-weight:700;
+  color:#f59e0b;
+  letter-spacing:1px;text-transform:uppercase;
+  margin-bottom:8px;
+}
+.notice-card-body{
+  font-size:13px;line-height:1.75;color:#ddd;
+}
+.notice-card-body strong{color:white;font-weight:700}
+
+.notice-divider{
+  height:1px;background:var(--border);
+  flex-shrink:0;
+}
+
+.challenge-btn{
+  width:100%;
+  padding:18px 12px;
+  background:var(--red);
+  color:white;border:none;
+  border-radius:14px;
+  font-size:17px;font-weight:800;
+  cursor:pointer;letter-spacing:-0.3px;
+  transition:transform .1s,background .15s;
+  -webkit-appearance:none;
+  line-height:1.3;
+  flex-shrink:0;
+}
+.challenge-btn:active{transform:scale(.97);background:var(--red-dark)}
+
+.total-count{
+  font-size:12px;color:var(--dim);
+  text-align:center;
+  flex-shrink:0;
+}
+
+/* ════════════════════════════════
+   SCREEN — READY
+════════════════════════════════ */
+#screen-ready{
+  background:var(--bg);
+  justify-content:center;align-items:center;
+  padding:48px 36px;
+}
+.ready-badge{
+  background:var(--red);color:white;
+  font-size:13px;font-weight:700;
+  padding:5px 14px;border-radius:99px;
+  letter-spacing:1px;
+  margin-bottom:48px;
+}
+.ready-q{
+  font-size:44px;font-weight:900;
+  text-align:center;line-height:1.25;
+  letter-spacing:-1.5px;
+  margin-bottom:16px;
+}
+.ready-sub{
+  font-size:15px;color:var(--dim2);
+  text-align:center;line-height:1.7;
+  margin-bottom:56px;
+}
+.ready-btns{display:flex;gap:14px;width:100%}
+.btn-yes{
+  flex:2;padding:22px;
+  background:var(--red);color:white;
+  border:none;border-radius:16px;
+  font-size:22px;font-weight:800;
+  cursor:pointer;-webkit-appearance:none;
+  transition:transform .1s;
+}
+.btn-no{
+  flex:1;padding:22px;
+  background:var(--card2);color:var(--dim2);
+  border:1.5px solid var(--border);border-radius:16px;
+  font-size:20px;font-weight:600;
+  cursor:pointer;-webkit-appearance:none;
+  transition:transform .1s;
+}
+.btn-yes:active,.btn-no:active{transform:scale(.97)}
+
+/* ════════════════════════════════
+   SCREEN — NAME
+════════════════════════════════ */
+#screen-name{
+  background:var(--bg);
+  justify-content:center;align-items:center;
+  padding:48px 36px;
+}
+.name-icon{font-size:48px;margin-bottom:24px}
+.name-title{font-size:28px;font-weight:800;text-align:center;margin-bottom:8px;letter-spacing:-0.5px}
+.name-sub{font-size:14px;color:var(--dim2);text-align:center;margin-bottom:36px}
+.name-input{
+  width:100%;
+  padding:18px 20px;
+  background:var(--card2);
+  border:2px solid var(--border);border-radius:14px;
+  font-size:24px;font-weight:600;color:white;
+  text-align:center;outline:none;
+  margin-bottom:16px;
+  -webkit-appearance:none;
+  caret-color:var(--red);
+  transition:border-color .2s;
+}
+.name-input:focus{border-color:var(--red)}
+.name-input::placeholder{color:#333}
+.btn-confirm{
+  width:100%;padding:20px;
+  background:var(--red);color:white;
+  border:none;border-radius:14px;
+  font-size:20px;font-weight:800;
+  cursor:pointer;-webkit-appearance:none;
+  transition:transform .1s,background .2s;
+}
+.btn-confirm:disabled{background:#282828;color:#444;cursor:default}
+.btn-confirm:not(:disabled):active{transform:scale(.97)}
+
+/* ════════════════════════════════
+   SCREEN — GAME
+════════════════════════════════ */
+#screen-game{background:var(--bg)}
+
+.game-header{
+  background:var(--card);
+  padding:14px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.game-player{font-size:14px;color:var(--dim2)}
+.game-player span{color:white;font-weight:700}
+.game-timer{
+  font-size:34px;font-weight:800;
+  font-variant-numeric:tabular-nums;
+  color:var(--dim);
+  letter-spacing:0;
+  transition:color .3s;
+}
+.game-timer.running{color:var(--red)}
+
+.game-body{
+  flex:1;
+  display:flex;flex-direction:column;
+  padding:16px 18px 12px;
+  gap:12px;
+  overflow:hidden;
+  min-height:0;
+}
+
+.section-label{
+  font-size:10px;color:var(--dim);
+  letter-spacing:2px;text-transform:uppercase;
+  font-weight:700;margin-bottom:6px;
+}
+
+.target-box{
+  background:var(--card2);
+  border:1.5px solid var(--border);border-radius:12px;
+  padding:16px 18px;
+  font-size:19px;line-height:1.85;font-weight:500;
+  letter-spacing:0.2px;
+  flex-shrink:0;
+}
+.c-pending{color:#3a3a3a}
+.c-correct{color:var(--green-light)}
+.c-wrong{color:#ef4444;text-decoration:underline;text-underline-offset:3px}
+.c-cursor{
+  color:white;background:var(--red);
+  border-radius:3px;padding:0 1px;
+}
+
+.progress-wrap{
+  height:5px;background:#1e1e1e;border-radius:99px;overflow:hidden;flex-shrink:0;
+}
+.progress-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,var(--red),#ff6b8a);
+  border-radius:99px;transition:width .08s linear;
+}
+
+.game-input{
+  flex:1;min-height:0;
+  width:100%;
+  background:var(--card2);
+  border:2px solid var(--border);border-radius:12px;
+  padding:14px 16px;
+  font-size:18px;font-weight:500;color:white;
+  outline:none;resize:none;
+  line-height:1.75;
+  caret-color:var(--red);
+  -webkit-appearance:none;
+  transition:border-color .2s;
+}
+.game-input:focus{border-color:#444}
+.game-input.done{border-color:var(--green)!important}
+.game-input::placeholder{color:#2e2e2e}
+
+.game-footer{
+  padding:12px 18px 16px;
+  flex-shrink:0;
+}
+.submit-btn{
+  width:100%;padding:18px;
+  background:var(--green);color:white;
+  border:none;border-radius:14px;
+  font-size:20px;font-weight:800;
+  cursor:pointer;-webkit-appearance:none;
+  transition:transform .1s,background .2s;
+}
+.submit-btn:disabled{background:#1e1e1e;color:#333;cursor:default}
+.submit-btn:not(:disabled):active{transform:scale(.97);background:#15803d}
+
+/* ════════════════════════════════
+   SCREEN — RESULT
+════════════════════════════════ */
+#screen-result{
+  background:var(--bg);
+  justify-content:center;align-items:center;
+  padding:40px 36px;
+  text-align:center;
+}
+.result-emoji{font-size:80px;margin-bottom:12px;line-height:1}
+.result-label{
+  font-size:12px;color:var(--dim);
+  letter-spacing:3px;text-transform:uppercase;
+  font-weight:600;margin-bottom:36px;
+}
+.result-box{
+  width:100%;
+  background:var(--card2);
+  border:1.5px solid var(--border);border-radius:18px;
+  padding:28px 32px;margin-bottom:16px;
+}
+.result-box-label{font-size:12px;color:var(--dim2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
+.result-time-num{
+  font-size:60px;font-weight:900;
+  color:var(--red);font-variant-numeric:tabular-nums;
+  letter-spacing:-2px;line-height:1;
+}
+.result-time-unit{font-size:22px;color:var(--dim2);margin-left:4px;font-weight:600}
+.result-rank-num{
+  font-size:48px;font-weight:900;
+  line-height:1;letter-spacing:-1px;
+}
+.result-rank-sub{font-size:13px;color:var(--dim);margin-top:8px}
+.btn-result{
+  width:100%;padding:20px;
+  background:var(--red);color:white;
+  border:none;border-radius:14px;
+  font-size:19px;font-weight:800;
+  cursor:pointer;-webkit-appearance:none;
+  margin-top:8px;
+  transition:transform .1s;
+}
+.btn-result:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<div id="screen-main" class="screen active">
+  <div class="main-header">
+    <div class="logo-3m">3M</div>
+    <div class="header-titles">
+      <h1>슈퍼그립 노컷7 타자 챌린지</h1>
+      <p>Supergrip No-Cut 7 Typing Challenge</p>
+    </div>
+  </div>
+
+  <div class="main-body">
+    <!-- Left: Ranking -->
+    <div class="ranking-col">
+      <div class="ranking-col-header">
+        <div class="live-dot"></div>
+        <h2>실시간 랭킹</h2>
+      </div>
+      <div class="ranking-scroll">
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th>순위</th>
+              <th>이름</th>
+              <th>기록</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Right: Notice + Button -->
+    <div class="notice-col">
+      <div class="notice-card">
+        <div class="notice-card-icon">⚠️</div>
+        <div class="notice-card-title">참여 안내</div>
+        <div class="notice-card-body">
+          게임 참여는<br>
+          <strong>노컷 7 볼트 조립을<br>통과한 분만</strong><br>
+          가능합니다.
+        </div>
+      </div>
+
+      <div class="notice-divider"></div>
+
+      <div class="notice-card" style="background:transparent;border-color:var(--border);border-style:dashed">
+        <div class="notice-card-icon">⌨️</div>
+        <div class="notice-card-body" style="font-size:12px;color:var(--dim2);line-height:1.8">
+          주어진 문장을 가장 빠르게 입력하는 챌린지입니다.<br><br>
+          상위 20위까지 랭킹에 등록됩니다.
+        </div>
+      </div>
+
+      <div style="flex:1"></div>
+      <div class="total-count" id="total-count"></div>
+
+      <button class="challenge-btn" onclick="goToReady()">
+        도전하시겠습니까?
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ READY ══════════════ -->
+<div id="screen-ready" class="screen">
+  <div class="ready-badge">슈퍼그립 노컷7 챌린지</div>
+  <div class="ready-q">준비<br>되셨나요?</div>
+  <p class="ready-sub">
+    제시된 문장을 빠르게 입력하고<br>
+    랭킹에 이름을 올려보세요!
+  </p>
+  <div class="ready-btns">
+    <button class="btn-yes" onclick="goToName()">예</button>
+    <button class="btn-no" onclick="goToMain()">아니오</button>
+  </div>
+</div>
+
+<!-- ══════════════ NAME ══════════════ -->
+<div id="screen-name" class="screen">
+  <div class="name-icon">✏️</div>
+  <h1 class="name-title">이름을 입력해주세요</h1>
+  <p class="name-sub">랭킹에 표시될 이름입니다 (최대 10자)</p>
+  <input
+    type="text" id="player-name-input" class="name-input"
+    placeholder="이름 입력" maxlength="10"
+    autocomplete="off" autocorrect="off"
+    autocapitalize="off" spellcheck="false"
+    oninput="onNameInput()"
+    onkeydown="if(event.key==='Enter')confirmName()"
+  />
+  <button class="btn-confirm" id="confirm-btn" disabled onclick="confirmName()">
+    확인 →
+  </button>
+</div>
+
+<!-- ══════════════ GAME ══════════════ -->
+<div id="screen-game" class="screen">
+  <div class="game-header">
+    <div class="game-player">참가자: <span id="game-player-name">-</span></div>
+    <div class="game-timer" id="game-timer">00.00<span style="font-size:15px;margin-left:2px;color:var(--dim)"> 초</span></div>
+  </div>
+
+  <div class="game-body">
+    <div>
+      <div class="section-label">목표 문장</div>
+      <div class="target-box" id="target-display"></div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+      <div class="section-label">입력 — 첫 글자 입력 시 타이머 시작</div>
+      <textarea
+        class="game-input" id="game-input"
+        placeholder="여기를 탭하고 위 문장을 똑같이 입력하세요..."
+        autocomplete="off" autocorrect="off"
+        autocapitalize="off" spellcheck="false"
+        oninput="onGameInput()"
+      ></textarea>
+    </div>
+  </div>
+
+  <div class="game-footer">
+    <button class="submit-btn" id="submit-btn" disabled onclick="submitGame()">
+      전송
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════ RESULT ══════════════ -->
+<div id="screen-result" class="screen">
+  <div class="result-emoji" id="result-emoji">🎉</div>
+  <div class="result-label">챌린지 완료!</div>
+
+  <div class="result-box">
+    <div class="result-box-label">기록</div>
+    <div>
+      <span class="result-time-num" id="result-time-num">0.00</span>
+      <span class="result-time-unit">초</span>
+    </div>
+  </div>
+
+  <div class="result-box">
+    <div class="result-box-label">랭킹 순위</div>
+    <div class="result-rank-num" id="result-rank-num">-위</div>
+    <div class="result-rank-sub" id="result-rank-sub"></div>
+  </div>
+
+  <button class="btn-result" onclick="goToMain()">랭킹 확인하기 →</button>
+</div>
+
+<script>
+const TARGET = "한국3M에서 출시된 슈퍼그립 노컷7 장갑은 텅스텐원사로 만들어진 베임방지 장갑으로 기존 제품에 비하여 베임방지 성능이 탁월하다.";
+const MAX_RANK = 20;
+const KEY = 'nocut7_v1';
+
+let player = '';
+let timerRaf = null;
+let startTime = null;
+let finalTime = null;
+let started = false;
+
+/* ── localStorage helpers ── */
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || []; }
+  catch { return []; }
+}
+function save(data) {
+  localStorage.setItem(KEY, JSON.stringify(data));
+}
+
+/* ── Add & rank ── */
+function addEntry(name, time) {
+  const list = load();
+  const entry = { name, time };
+  list.push(entry);
+  list.sort((a, b) => a.time - b.time);
+  const rank = list.indexOf(entry) + 1;
+  if (list.length > MAX_RANK) list.splice(MAX_RANK);
+  save(list);
+  return rank;
+}
+
+/* ── Render ranking table ── */
+function renderRanking() {
+  const list = load();
+  const tbody = document.getElementById('ranking-body');
+  const count = document.getElementById('total-count');
+
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="3"><div class="r-empty">아직 기록이 없습니다.<br>첫 번째 도전자가 되어보세요! 🔥</div></td></tr>`;
+    count.textContent = '';
+    return;
+  }
+
+  const medals = ['🥇','🥈','🥉'];
+  tbody.innerHTML = list.map((r, i) => {
+    const n = i + 1;
+    const numClass = n <= 3 ? `r${n}` : 'rn';
+    const numText  = n <= 3 ? medals[i] : n;
+    return `<tr class="data-row">
+      <td class="r-num ${numClass}">${numText}</td>
+      <td class="r-name">${esc(r.name)}</td>
+      <td class="r-time">${r.time.toFixed(2)}초</td>
+    </tr>`;
+  }).join('');
+
+  count.textContent = `현재 ${list.length}명 참여 · TOP ${MAX_RANK}`;
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── Screen navigation ── */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goToMain() {
+  stopTimer();
+  resetGameState();
+  renderRanking();
+  show('screen-main');
+}
+
+function goToReady() {
+  show('screen-ready');
+}
+
+function goToName() {
+  document.getElementById('player-name-input').value = '';
+  document.getElementById('confirm-btn').disabled = true;
+  show('screen-name');
+  setTimeout(() => document.getElementById('player-name-input').focus(), 350);
+}
+
+/* ── Name screen ── */
+function onNameInput() {
+  const v = document.getElementById('player-name-input').value.trim();
+  document.getElementById('confirm-btn').disabled = !v.length;
+}
+
+function confirmName() {
+  const v = document.getElementById('player-name-input').value.trim();
+  if (!v) return;
+  player = v;
+  initGame();
+}
+
+/* ── Game init ── */
+function initGame() {
+  stopTimer();
+  resetGameState();
+
+  document.getElementById('game-player-name').textContent = player;
+  renderTarget('');
+
+  const timerEl = document.getElementById('game-timer');
+  timerEl.innerHTML = '00.00<span style="font-size:15px;margin-left:2px;color:var(--dim)"> 초</span>';
+  timerEl.classList.remove('running');
+
+  show('screen-game');
+  setTimeout(() => document.getElementById('game-input').focus(), 400);
+}
+
+function resetGameState() {
+  const inp = document.getElementById('game-input');
+  if (inp) {
+    inp.value = '';
+    inp.disabled = false;
+    inp.classList.remove('done');
+  }
+  const btn = document.getElementById('submit-btn');
+  if (btn) btn.disabled = true;
+  const bar = document.getElementById('progress-fill');
+  if (bar) bar.style.width = '0%';
+  started = false;
+  startTime = null;
+  finalTime = null;
+}
+
+/* ── Timer ── */
+function startTimer() {
+  if (started) return;
+  started = true;
+  startTime = performance.now();
+  document.getElementById('game-timer').classList.add('running');
+  tickTimer();
+}
+
+function tickTimer() {
+  const el = document.getElementById('game-timer');
+  if (!el || !started) return;
+  const s = ((performance.now() - startTime) / 1000).toFixed(2);
+  el.innerHTML = s + '<span style="font-size:15px;margin-left:2px;color:#aaa"> 초</span>';
+  timerRaf = requestAnimationFrame(tickTimer);
+}
+
+function stopTimer() {
+  if (timerRaf) { cancelAnimationFrame(timerRaf); timerRaf = null; }
+  if (started && startTime) {
+    finalTime = (performance.now() - startTime) / 1000;
+  }
+}
+
+/* ── Game input handler ── */
+function onGameInput() {
+  const inp = document.getElementById('game-input');
+  const val = inp.value;
+
+  if (!started && val.length > 0) startTimer();
+
+  renderTarget(val);
+
+  const pct = Math.min(val.length / TARGET.length * 100, 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+
+  const match = val === TARGET;
+  inp.classList.toggle('done', match);
+  document.getElementById('submit-btn').disabled = !match;
+}
+
+/* ── Target text renderer ── */
+function renderTarget(input) {
+  const box = document.getElementById('target-display');
+  let html = '';
+  for (let i = 0; i < TARGET.length; i++) {
+    const raw = TARGET[i];
+    const ch  = raw === ' ' ? ' ' : esc(raw);
+    if (i < input.length) {
+      html += input[i] === raw
+        ? `<span class="c-correct">${ch}</span>`
+        : `<span class="c-wrong">${ch}</span>`;
+    } else if (i === input.length) {
+      html += `<span class="c-cursor">${ch}</span>`;
+    } else {
+      html += `<span class="c-pending">${ch}</span>`;
+    }
+  }
+  box.innerHTML = html;
+}
+
+/* ── Submit ── */
+function submitGame() {
+  const inp = document.getElementById('game-input');
+  if (inp.value !== TARGET) return;
+
+  stopTimer();
+  inp.disabled = true;
+  document.getElementById('submit-btn').disabled = true;
+
+  const rank = addEntry(player, finalTime);
+  const total = load().length;
+
+  /* result screen */
+  document.getElementById('result-time-num').textContent = finalTime.toFixed(2);
+
+  const rankEl = document.getElementById('result-rank-num');
+  const sub    = document.getElementById('result-rank-sub');
+  const emoji  = document.getElementById('result-emoji');
+
+  if (rank > MAX_RANK) {
+    rankEl.textContent = 'TOP 20 밖';
+    rankEl.style.color = 'var(--dim2)';
+    emoji.textContent = '😅';
+    sub.textContent = `기록: ${finalTime.toFixed(2)}초 · 다음에 도전해보세요!`;
+  } else {
+    rankEl.textContent = rank + '위';
+    sub.textContent = `전체 ${total}명 중`;
+    if (rank === 1) {
+      rankEl.style.color = 'var(--gold)';
+      emoji.textContent = '🥇';
+    } else if (rank === 2) {
+      rankEl.style.color = 'var(--silver)';
+      emoji.textContent = '🥈';
+    } else if (rank === 3) {
+      rankEl.style.color = 'var(--bronze)';
+      emoji.textContent = '🥉';
+    } else {
+      rankEl.style.color = 'white';
+      emoji.textContent = '🎉';
+    }
+  }
+
+  show('screen-result');
+}
+
+/* ── Boot ── */
+renderRanking();
+renderTarget('');
+</script>
+</body>
+</html>
