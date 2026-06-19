@@ -95,20 +95,18 @@ html,body{
 ::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:2px}
 
 .ranking-table{width:100%;border-collapse:collapse;table-layout:fixed}
-.ranking-table colgroup col:nth-child(1){width:80px}
+.ranking-table colgroup col:nth-child(1){width:110px}
 .ranking-table colgroup col:nth-child(2){width:auto}
-.ranking-table colgroup col:nth-child(3){width:220px}
+.ranking-table colgroup col:nth-child(3){width:170px}
 .ranking-table th{
   font-size:32px;color:#ccc;font-weight:700;
-  padding:14px 12px;text-align:left;
+  padding:14px 10px;text-align:left;
   background:var(--card);
   border-bottom:1px solid var(--border);
-  letter-spacing:0px;
+  white-space:nowrap;
 }
-.ranking-table th:last-child{text-align:right}
-
 .ranking-table tr.data-row td{
-  padding:14px 8px;
+  padding:14px 10px;
   border-bottom:1px solid #1c1c1c;
   font-size:42px;vertical-align:middle;
   overflow:hidden;text-overflow:clip;white-space:nowrap;
@@ -122,7 +120,7 @@ html,body{
 .r-num.rn{color:#ccc;font-size:40px;font-weight:700}
 .r-name{font-weight:600;font-size:42px;color:#f0f0f0}
 .r-time{
-  text-align:right;
+  text-align:left;
   font-variant-numeric:tabular-nums;
   font-weight:700;font-size:42px;
   color:var(--green-light);
