@@ -82,7 +82,39 @@ html,body{
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:10px;flex-shrink:0;
 }
-.ranking-col-header h2{font-size:77px;font-weight:900}
+.ranking-col-header h2{font-size:77px;font-weight:900;flex:1}
+.reset-btn{
+  font-size:22px;color:#555;background:none;border:1px solid #333;
+  border-radius:8px;padding:6px 14px;cursor:pointer;flex-shrink:0;
+}
+.reset-btn:hover{color:#ccc;border-color:#555}
+
+/* 초기화 모달 */
+.reset-modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.85);z-index:999;
+  justify-content:center;align-items:center;
+}
+.reset-modal.open{display:flex}
+.reset-modal-box{
+  background:#1e1e1e;border:1px solid #333;border-radius:16px;
+  padding:36px 32px;width:320px;text-align:center;
+}
+.reset-modal-box h3{font-size:28px;font-weight:800;color:#fff;margin-bottom:10px}
+.reset-modal-box p{font-size:18px;color:#aaa;margin-bottom:24px}
+.reset-pw-input{
+  width:100%;padding:14px;box-sizing:border-box;
+  background:#2a2a2a;color:#fff;border:1px solid #444;
+  border-radius:10px;font-size:24px;text-align:center;
+  letter-spacing:8px;margin-bottom:20px;
+}
+.reset-modal-btns{display:flex;gap:12px}
+.reset-modal-btns button{
+  flex:1;padding:14px;border:none;border-radius:10px;
+  font-size:20px;font-weight:700;cursor:pointer;
+}
+.reset-cancel{background:#333;color:#ccc}
+.reset-confirm{background:var(--red);color:#fff}
 .live-dot{
   width:14px;height:14px;border-radius:50%;
   background:var(--red);
@@ -445,6 +477,7 @@ html,body{
       <div class="ranking-col-header">
         <div class="live-dot"></div>
         <h2>실시간 랭킹</h2>
+        <button class="reset-btn" onclick="openResetModal()">초기화</button>
       </div>
       <div class="ranking-scroll">
         <table class="ranking-table">
@@ -868,6 +901,53 @@ async function submitGame() {
 /* ── Boot ── */
 startPolling();
 renderTarget('');
+
+/* ── 기록 초기화 ── */
+function openResetModal() {
+  document.getElementById('reset-pw').value = '';
+  document.getElementById('reset-modal').classList.add('open');
+  setTimeout(() => document.getElementById('reset-pw').focus(), 100);
+}
+function closeResetModal() {
+  document.getElementById('reset-modal').classList.remove('open');
+}
+async function confirmReset() {
+  const pw = document.getElementById('reset-pw').value;
+  if (pw !== '1234') {
+    document.getElementById('reset-pw').value = '';
+    document.getElementById('reset-pw').placeholder = '비밀번호 오류 ✕';
+    setTimeout(() => { document.getElementById('reset-pw').placeholder = '비밀번호'; }, 1500);
+    return;
+  }
+  try {
+    const res = await fetch('/api/nocut7', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: '1234' })
+    });
+    if (!res.ok && res.status !== 503) {
+      alert('초기화 실패');
+      return;
+    }
+  } catch {}
+  lsSave([]);
+  closeResetModal();
+  await renderRanking();
+}
 </script>
+
+<!-- 초기화 모달 -->
+<div id="reset-modal" class="reset-modal" onclick="if(event.target===this)closeResetModal()">
+  <div class="reset-modal-box">
+    <h3>기록 초기화</h3>
+    <p>비밀번호를 입력하세요</p>
+    <input type="password" id="reset-pw" class="reset-pw-input" placeholder="비밀번호" maxlength="10"
+      onkeydown="if(event.key==='Enter')confirmReset()">
+    <div class="reset-modal-btns">
+      <button class="reset-cancel" onclick="closeResetModal()">취소</button>
+      <button class="reset-confirm" onclick="confirmReset()">초기화</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

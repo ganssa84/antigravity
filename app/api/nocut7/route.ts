@@ -43,3 +43,18 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ rank: (faster ?? 0) + 1, total: total ?? 0 });
 }
+
+export async function DELETE(req: Request) {
+  const body = await req.json().catch(() => ({}));
+  if (body.password !== '1234') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const { error } = await supabase
+    .from('nocut7_rankings')
+    .delete()
+    .gte('time', 0);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 503 });
+  }
+  return NextResponse.json({ ok: true });
+}
