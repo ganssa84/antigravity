@@ -558,6 +558,7 @@ html,body{
     oninput="onNameInput()"
     onkeydown="if(event.key==='Enter')confirmName()"
   />
+  <p id="name-dup-msg" style="color:#f5a623;font-size:22px;min-height:30px;margin:6px 0 0;"></p>
   <button class="btn-confirm" id="confirm-btn" disabled onclick="confirmName()">
     확인 →
   </button>
@@ -752,11 +753,31 @@ function goToName() {
 function onNameInput() {
   const v = document.getElementById('player-name-input').value.trim();
   document.getElementById('confirm-btn').disabled = !v.length;
+  document.getElementById('name-dup-msg').textContent = '';
 }
 
-function confirmName() {
+async function confirmName() {
   const v = document.getElementById('player-name-input').value.trim();
   if (!v) return;
+
+  const dupMsg = document.getElementById('name-dup-msg');
+  const list = await fetchRankings();
+  const exists = list.some(r => r.name === v);
+
+  if (exists) {
+    // 숫자 접미사 추천: 이름2, 이름3, ...
+    let suggestion = v;
+    const base = v.replace(/\d+$/, '');
+    for (let n = 2; n <= 99; n++) {
+      const candidate = (base + n).slice(0, 10);
+      if (!list.some(r => r.name === candidate)) { suggestion = candidate; break; }
+    }
+    dupMsg.textContent = `⚠️ 이미 있는 이름입니다. "${suggestion}" 은 어떨까요?`;
+    document.getElementById('player-name-input').focus();
+    return;
+  }
+
+  dupMsg.textContent = '';
   player = v;
   initGame();
 }
