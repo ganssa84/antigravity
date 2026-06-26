@@ -558,7 +558,7 @@ html,body{
     oninput="onNameInput()"
     onkeydown="if(event.key==='Enter')confirmName()"
   />
-  <p id="name-dup-msg" style="color:#f5a623;font-size:22px;min-height:30px;margin:6px 0 0;"></p>
+  <p id="name-dup-msg" style="color:#f5a623;font-size:22px;min-height:30px;margin:6px 0 12px;width:100%;text-align:center;"></p>
   <button class="btn-confirm" id="confirm-btn" disabled onclick="confirmName()">
     확인 →
   </button>
@@ -649,7 +649,7 @@ function lsSave(list) {
 /* ── API (실패 시 localStorage 폴백) ── */
 async function fetchRankings() {
   try {
-    const res = await fetch('/api/nocut7');
+    const res = await fetch('/api/nocut7', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) return data;
