@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { getSalesByDateRange } from "@/lib/heartain-db";
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, LabelList,
 } from "recharts";
 
@@ -80,8 +80,7 @@ function fmtAmt(n: number): string {
 function fmtBarLabel(v: number, viewMode: ViewMode): string {
   if (v <= 0) return "";
   if (viewMode === "quantity") return `${Math.round(v)}`;
-  if (v >= 1000) return `${Math.round(v / 1000)}K`;
-  return `${Math.round(v)}`;
+  return Math.round(v).toLocaleString();
 }
 
 const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
@@ -125,6 +124,9 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState(BUSINESS_START);
   const [toDate, setToDate] = useState(today);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
@@ -132,7 +134,30 @@ export default function AnalyticsPage() {
     getSalesByDateRange(fromDate, toDate)
       .then((data) => setRaw(data as unknown as SaleRow[]))
       .finally(() => setLoading(false));
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, refreshKey]);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/heartain/sync-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ days: 30 }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setSyncResult(`완료 — ${json.processed}건 추가, ${json.skipped}건 중복 스킵`);
+        setRefreshKey((k) => k + 1);
+      } else {
+        setSyncResult(`오류: ${json.error}`);
+      }
+    } catch (e: any) {
+      setSyncResult(`오류: ${e.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   // 모든 제품을 매출 기준으로 정렬
   const chartKeys = useMemo(() => {
@@ -164,7 +189,7 @@ export default function AnalyticsPage() {
     return allKeys.map((key) => {
       const vals = byPeriod[key];
       const total = Object.values(vals).reduce((s, v) => s + v, 0);
-      return { label: formatLabel(key, period), ...vals, __total__: total };
+      return { label: formatLabel(key, period), ...vals, __total__: total, __label__: 0 };
     });
   }, [raw, period, viewMode, fromDate, toDate]);
 
@@ -173,7 +198,7 @@ export default function AnalyticsPage() {
     if (!highlighted) return chartData;
     return chartData.map((row) => {
       const val = (row as any)[highlighted] ?? 0;
-      const result: Record<string, any> = { label: row.label, __total__: val };
+      const result: Record<string, any> = { label: row.label, __total__: val, __label__: 0 };
       for (const key of chartKeys) result[key] = key === highlighted ? val : 0;
       return result;
     });
@@ -216,14 +241,30 @@ export default function AnalyticsPage() {
   const xAxisInterval =
     period === "daily" ? Math.max(Math.floor(chartData.length / 10), 6) : "preserveStartEnd";
 
-  // 막대 수가 적을 때만 레이블 표시
-  const showLabels = chartData.length <= 24;
-
   return (
     <div className="space-y-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-bold text-gray-900">매출 분석</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold text-gray-900">매출 분석</h1>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <svg
+              className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {syncing ? "동기화 중..." : "최신 주문 동기화"}
+          </button>
+          {syncResult && (
+            <span className="text-xs text-gray-500">{syncResult}</span>
+          )}
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* 날짜 직접 선택 */}
           <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm shadow-sm">
@@ -287,6 +328,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
@@ -343,22 +385,19 @@ export default function AnalyticsPage() {
                   />
                   <YAxis
                     tickFormatter={(v) =>
-                      viewMode === "amount" ? `${Math.round(v / 1000)}K` : `${v}`
+                      viewMode === "amount" ? Math.round(v).toLocaleString() : `${v}`
                     }
                     tick={{ fill: "#9ca3af", fontSize: 11 }}
-                    width={45}
+                    width={90}
                   />
                   <Tooltip content={<CustomTooltip viewMode={viewMode} />} />
                   <Legend
                     wrapperStyle={{ paddingTop: 8 }}
                     content={(props: any) => {
                       const items: any[] = props.payload ?? [];
-                      // 합계(Line)를 맨 뒤로 고정
-                      const bars = chartKeys
+                      const sorted = chartKeys
                         .map((key) => items.find((p) => p.value === key))
                         .filter(Boolean);
-                      const total = items.find((p) => p.value === "합계");
-                      const sorted = total ? [...bars, total] : bars;
                       return (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px", justifyContent: "center", fontSize: 12, cursor: "pointer" }}>
                           {sorted.map((entry) => (
@@ -367,18 +406,12 @@ export default function AnalyticsPage() {
                               onClick={() => handleLegendClick(entry)}
                               style={{
                                 display: "flex", alignItems: "center", gap: 4,
-                                opacity: highlighted && highlighted !== entry.value && entry.value !== "합계" ? 0.3 : 1,
+                                opacity: highlighted && highlighted !== entry.value ? 0.3 : 1,
                                 fontWeight: highlighted === entry.value ? 600 : 400,
                                 transition: "opacity 0.15s",
                               }}
                             >
-                              {entry.value === "합계" ? (
-                                <svg width="16" height="10" style={{ flexShrink: 0 }}>
-                                  <line x1="0" y1="5" x2="16" y2="5" stroke="#111827" strokeWidth="2" strokeDasharray="5 3" />
-                                </svg>
-                              ) : (
-                                <span style={{ width: 10, height: 10, background: entry.color, borderRadius: 2, flexShrink: 0, display: "inline-block" }} />
-                              )}
+                              <span style={{ width: 10, height: 10, background: entry.color, borderRadius: 2, flexShrink: 0, display: "inline-block" }} />
                               {entry.value}
                             </span>
                           ))}
@@ -400,28 +433,23 @@ export default function AnalyticsPage() {
                           ? [3, 3, 0, 0]
                           : undefined
                       }
-                    >
-                      {/* 마지막 bar에 합계 레이블 표시 */}
-                      {showLabels && i === chartKeys.length - 1 && (
-                        <LabelList
-                          dataKey="__total__"
-                          position="top"
-                          formatter={(v: any) => fmtBarLabel(Number(v), viewMode)}
-                          style={{ fontSize: 11, fill: "#374151", fontWeight: 600 }}
-                        />
-                      )}
-                    </Bar>
+                    />
                   ))}
-                  <Line
-                    type="monotone"
-                    dataKey="__total__"
-                    name="합계"
-                    stroke="#111827"
-                    strokeWidth={2}
-                    dot={false}
-                    strokeDasharray="5 3"
-                    opacity={highlighted ? 0.4 : 0.7}
-                  />
+                  {/* 항상 스택 맨 위에 올라가는 투명 bar — 전체 합계 레이블 전용 */}
+                  <Bar
+                    dataKey="__label__"
+                    stackId="stack"
+                    fill="transparent"
+                    legendType="none"
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey="__total__"
+                      position="top"
+                      formatter={(v: any) => fmtBarLabel(Number(v), viewMode)}
+                      style={{ fontSize: 11, fill: "#374151", fontWeight: 600 }}
+                    />
+                  </Bar>
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
