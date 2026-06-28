@@ -124,9 +124,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState(BUSINESS_START);
   const [toDate, setToDate] = useState(today);
-  const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -134,30 +132,19 @@ export default function AnalyticsPage() {
     getSalesByDateRange(fromDate, toDate)
       .then((data) => setRaw(data as unknown as SaleRow[]))
       .finally(() => setLoading(false));
-  }, [fromDate, toDate, refreshKey]);
+  }, [fromDate, toDate]);
 
-  async function handleSync() {
-    setSyncing(true);
-    setSyncResult(null);
-    try {
-      const res = await fetch("/api/heartain/sync-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ days: 30 }),
-      });
-      const json = await res.json();
-      if (json.ok) {
-        setSyncResult(`완료 — ${json.processed}건 추가, ${json.skipped}건 중복 스킵`);
-        setRefreshKey((k) => k + 1);
-      } else {
-        setSyncResult(`오류: ${json.error}`);
-      }
-    } catch (e: any) {
-      setSyncResult(`오류: ${e.message}`);
-    } finally {
-      setSyncing(false);
-    }
-  }
+  useEffect(() => {
+    fetch("/api/heartain/sync-orders")
+      .then((r) => r.json())
+      .then((logs) => {
+        if (logs?.[0]?.synced_at) {
+          const d = new Date(logs[0].synced_at);
+          setLastSync(d.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // 모든 제품을 매출 기준으로 정렬
   const chartKeys = useMemo(() => {
@@ -247,22 +234,8 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-gray-900">매출 분석</h1>
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg
-              className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {syncing ? "동기화 중..." : "최신 주문 동기화"}
-          </button>
-          {syncResult && (
-            <span className="text-xs text-gray-500">{syncResult}</span>
+          {lastSync && (
+            <span className="text-xs text-gray-400">마지막 동기화 {lastSync}</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
