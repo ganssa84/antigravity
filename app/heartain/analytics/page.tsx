@@ -117,12 +117,13 @@ const CustomTooltip = ({ active, payload, label, viewMode }: any) => {
 
 export default function AnalyticsPage() {
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
-  const [period, setPeriod] = useState<Period>("monthly");
-  const [viewMode, setViewMode] = useState<ViewMode>("amount");
+  const monthStart = useMemo(() => today.slice(0, 7) + "-01", [today]);
+  const [period, setPeriod] = useState<Period>("daily");
+  const [viewMode, setViewMode] = useState<ViewMode>("quantity");
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [raw, setRaw] = useState<SaleRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fromDate, setFromDate] = useState(BUSINESS_START);
+  const [fromDate, setFromDate] = useState(monthStart);
   const [toDate, setToDate] = useState(today);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
@@ -261,9 +262,9 @@ export default function AnalyticsPage() {
               onChange={(e) => { if (e.target.value) setToDate(e.target.value); }}
               className="text-gray-700 outline-none cursor-pointer bg-transparent"
             />
-            {(fromDate !== BUSINESS_START || toDate !== today) && (
+            {(fromDate !== monthStart || toDate !== today) && (
               <button
-                onClick={() => { setFromDate(BUSINESS_START); setToDate(today); }}
+                onClick={() => { setFromDate(monthStart); setToDate(today); }}
                 className="text-xs text-blue-500 hover:text-blue-700 shrink-0"
               >
                 초기화
