@@ -50,6 +50,10 @@ export default function InventoryPage() {
   const [mappings, setMappings] = useState<NaverMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "low">("all");
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const toggleExpand = (id: number) =>
+    setExpanded((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -220,15 +224,31 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-900">{item.name}</span>
+                        {itemNaverNames.length > 0 ? (
+                          <button
+                            onClick={() => toggleExpand(item.id)}
+                            className="flex items-center gap-1.5 font-medium text-gray-900 hover:text-blue-600 transition-colors text-left"
+                          >
+                            <svg
+                              className={`w-3 h-3 text-gray-400 shrink-0 transition-transform ${expanded.has(item.id) ? "rotate-90" : ""}`}
+                              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            {item.name}
+                            <span className="text-xs text-gray-300 font-normal">({itemNaverNames.length})</span>
+                          </button>
+                        ) : (
+                          <span className="font-medium text-gray-900">{item.name}</span>
+                        )}
                         {isLow && (
                           <span className="text-xs text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-medium">
                             부족
                           </span>
                         )}
                       </div>
-                      {itemNaverNames.length > 0 && (
-                        <div className="mt-0.5 space-y-0.5">
+                      {expanded.has(item.id) && itemNaverNames.length > 0 && (
+                        <div className="mt-1.5 space-y-0.5 pl-4 border-l-2 border-gray-100">
                           {itemNaverNames.map((n, i) => (
                             <p key={i} className="text-xs text-gray-400 leading-tight">
                               {n}
