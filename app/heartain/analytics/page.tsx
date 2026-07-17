@@ -126,6 +126,7 @@ export default function AnalyticsPage() {
   const [fromDate, setFromDate] = useState(monthStart);
   const [toDate, setToDate] = useState(today);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
@@ -133,7 +134,7 @@ export default function AnalyticsPage() {
     getSalesByDateRange(fromDate, toDate)
       .then((data) => setRaw(data as unknown as SaleRow[]))
       .finally(() => setLoading(false));
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, refreshKey]);
 
   useEffect(() => {
     fetch("/api/heartain/sync-orders")
@@ -235,8 +236,19 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-gray-900">매출 분석</h1>
+          <button
+            onClick={() => setRefreshKey((k) => k + 1)}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title="데이터 새로고침"
+          >
+            <svg className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            새로고침
+          </button>
           {lastSync && (
-            <span className="text-xs text-gray-400">마지막 동기화 {lastSync}</span>
+            <span className="text-xs text-gray-400">동기화 {lastSync}</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
