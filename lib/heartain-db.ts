@@ -62,7 +62,7 @@ export async function getInventory(): Promise<InventoryItem[]> {
         shipping_cost, margin, is_active, sort_order
       )
     `)
-    .order("heartain_products(name)");
+    .order("heartain_products(sort_order)");
   if (error) throw error;
   return (data ?? []).map((row: any) => ({
     ...row.heartain_products,
